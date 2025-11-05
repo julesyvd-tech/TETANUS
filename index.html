@@ -146,3 +146,185 @@
   }
   drawStars();
   </script>
+  <script>
+// === GAME SETUP ===
+const playfield = document.getElementById("playfield");
+const rows = 20;
+const cols = 10;
+const grid = Array.from({ length: rows }, () => Array(cols).fill(null));
+const fallDelay = 300; // milliseconds per drop (classic Tetris-fast)
+
+let currentPiece = null;
+let gameRunning = true;
+
+// SVG "blocks"
+const svgs = {
+  pill: `<svg width="24" height="24" viewBox="0 0 24 24">
+          <rect x="1" y="6" width="10" height="12" rx="6" fill="#ff4da6"/>
+          <rect x="11" y="6" width="10" height="12" rx="6" fill="#ffffff"/>
+        </svg>`,
+  cig: `<svg width="24" height="24" viewBox="0 0 24 24">
+          <rect x="2" y="9" width="20" height="6" fill="#f5deb3"/>
+          <rect x="18" y="9" width="4" height="6" fill="#ff3300"/>
+        </svg>`,
+  pipe: `<svg width="24" height="24" viewBox="0 0 24 24">
+           <path d="M4 14 h16 v4 a4 4 0 0 1 -4 4 h-8 a4 4 0 0 1 -4 -4 z" fill="#666666"/>
+           <rect x="10" y="4" width="4" height="8" fill="#444444"/>
+         </svg>`
+};
+
+function randomPiece() {
+  const types = Object.keys(svgs);
+  const type = types[Math.floor(Math.random() * types.length)];
+  return {
+    shape: [[1]], // simple 1x1 block style
+    x: Math.floor(cols / 2),
+    y: 0,
+    svg: svgs[type]
+  };
+}
+
+function drawBoard() {
+  playfield.innerHTML = "";
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const cell = document.createElement("div");
+      cell.classList.add("cell");
+      cell.style.border = "0.5px solid rgba(255,255,255,0.05)";
+      cell.style.display = "flex";
+      cell.style.justifyContent = "center";
+      cell.style.alignItems = "center";
+      cell.innerHTML = grid[y][x] ? grid[y][x] : "";
+      playfield.appendChild(cell);
+    }
+  }
+  if (currentPiece) {
+    const cellIndex = currentPiece.y * cols + currentPiece.x;
+    const cell = playfield.children[cellIndex];
+    if (cell) cell.innerHTML = currentPiece.svg;
+  }
+}
+
+function canMoveDown(piece) {
+  if (piece.y >= rows - 1) return false;
+  return !grid[piece.y + 1][piece.x];
+}
+
+function placePiece(piece) {
+  grid[piece.y][piece.x] = piece.svg;
+  clearLines();
+}
+
+function clearLines() {
+  for (let y = rows - 1; y >= 0; y--) {
+    if (grid[y].every(cell => cell !== null)) {
+      grid.splice(y, 1);
+      grid.unshift(Array(cols).fill(null));
+    }
+  }
+}
+
+function gameOver() {
+  gameRunning = false;
+  document.getElementById("score").textContent = "Score: GAME OVER";
+  setTimeout(() => restartGame(), 2500);
+}
+
+function restartGame() {
+  for (let y = 0; y < rows; y++) grid[y].fill(null);
+  document.getElementById("score").textContent = "Score: -000000";
+  gameRunning = true;
+  loop();
+}
+
+function loop() {
+  if (!gameRunning) return;
+  if (!currentPiece) currentPiece = randomPiece();
+
+  if (canMoveDown(currentPiece)) {
+    currentPiece.y++;
+  } else {
+    placePiece(currentPiece);
+    if (currentPiece.y === 0) {
+      gameOver();
+      return;
+    }
+    currentPiece = randomPiece();
+  }
+
+  drawBoard();
+  setTimeout(loop, fallDelay);
+}
+
+loop();
+  </script>
+  <script>
+// === TIMER ===
+let totalSeconds = 220; // starting time
+const timerEl = document.getElementById("timer");
+
+function updateTimer() {
+  if (totalSeconds > 0) {
+    totalSeconds--;
+    const m = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
+    const s = String(totalSeconds % 60).padStart(2, "0");
+    timerEl.textContent = `Time’sUp: ${m}:${s}`;
+  } else {
+    timerEl.textContent = "Time’sUp: 00:00";
+    timerEl.classList.add("flash");
+  }
+}
+setInterval(updateTimer, 1000);
+
+// === AUDIO LOOPING (Bleep → GULP) ===
+const track1 = new Audio("Bleep (mxd).wav");
+const track2 = new Audio("G U L P (mxd).wav");
+track1.volume = 0.6;
+track2.volume = 0.6;
+track1.loop = false;
+track2.loop = false;
+
+track1.addEventListener("ended", () => {
+  track2.play();
+});
+track2.addEventListener("ended", () => {
+  track1.play();
+});
+
+window.addEventListener("click", () => {
+  // start playback on first user interaction (mobile autoplay fix)
+  if (track1.paused && track2.paused) {
+    track1.play();
+  }
+});
+
+// === GAME-OVER FADE ===
+function gameOver() {
+  gameRunning = false;
+  document.getElementById("score").textContent = "Score: GAME OVER";
+  document.getElementById("playfield").style.transition = "opacity 1.2s ease";
+  document.getElementById("playfield").style.opacity = "0.3";
+  setTimeout(() => restartGame(), 3000);
+}
+function restartGame() {
+  for (let y = 0; y < rows; y++) grid[y].fill(null);
+  document.getElementById("score").textContent = "Score: -000000";
+  document.getElementById("playfield").style.opacity = "1";
+  totalSeconds = 220;
+  timerEl.classList.remove("flash");
+  gameRunning = true;
+  currentPiece = null;
+  loop();
+}
+
+// === RESPONSIVE SCALING ===
+function scalePlayfield() {
+  const field = document.getElementById("playfield");
+  const scale = Math.min(window.innerWidth / 400, window.innerHeight / 700);
+  field.style.transform = `scale(${scale})`;
+}
+window.addEventListener("resize", scalePlayfield);
+scalePlayfield();
+</script>
+</body>
+</html>
