@@ -251,7 +251,7 @@ setInterval(() => {
   document.getElementById('scoreValue').textContent = score;
 }, 800);
 
-/* --- Music --- */
+/* --- Background music --- */
 const bg = document.getElementById('bgMusic');
 const tracks = [
   "Bleep (mxd).wav",
@@ -271,76 +271,83 @@ document.body.addEventListener('click', () => {
   playMusic();
 }, { once:true });
 
-/* --- Tetanus falling pieces --- */
+/* --- Falling pieces --- */
 const playfield = document.getElementById('playfield');
 const cols = 10, rows = 20;
-const grid = Array.from({length: rows}, () => Array(cols).fill(null));
+const grid = Array.from({ length: rows }, () => Array(cols).fill(null));
 
-const images = [
-  "💊", // pill
-  "🚬", // cigarette
-  "🧪"  // pipe
-];
-
+const emojis = ["💊", "🚬", "🧪"];
 const cellSize = 24;
+
+/* Proper centering + grid render */
 playfield.style.display = "grid";
 playfield.style.gridTemplateColumns = `repeat(${cols}, ${cellSize}px)`;
 playfield.style.gridTemplateRows = `repeat(${rows}, ${cellSize}px)`;
+playfield.style.placeItems = "center";
 playfield.style.justifyContent = "center";
 playfield.style.alignContent = "center";
 playfield.style.fontSize = "20px";
+playfield.style.lineHeight = `${cellSize}px`;
 
-function drawGrid() {
+function drawGrid(currentPiece) {
   playfield.innerHTML = "";
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
-      const cell = document.createElement("div");
-      cell.style.width = `${cellSize}px`;
-      cell.style.height = `${cellSize}px`;
-      cell.style.textAlign = "center";
-      cell.style.color = "#00ffcc";
-      cell.textContent = grid[y][x] || "";
-      playfield.appendChild(cell);
+      const div = document.createElement("div");
+      div.style.width = `${cellSize}px`;
+      div.style.height = `${cellSize}px`;
+      div.style.textAlign = "center";
+      div.style.color = "#00ffcc";
+      div.textContent = grid[y][x] || "";
+      playfield.appendChild(div);
     }
+  }
+  if (currentPiece) {
+    const idx = currentPiece.y * cols + currentPiece.x;
+    playfield.children[idx].textContent = currentPiece.shape;
   }
 }
 
-let current = {
-  x: Math.floor(cols/2),
+/* Piece logic */
+let piece = {
+  x: Math.floor(cols / 2),
   y: 0,
-  shape: images[Math.floor(Math.random()*images.length)]
+  shape: emojis[Math.floor(Math.random() * emojis.length)]
 };
 
 function canMove(x, y) {
   return y < rows && !grid[y]?.[x];
 }
 
-function placePiece() {
-  grid[current.y][current.x] = current.shape;
+function lockPiece() {
+  grid[piece.y][piece.x] = piece.shape;
 }
 
 function clearLines() {
-  for (let y = rows-1; y >= 0; y--) {
+  for (let y = rows - 1; y >= 0; y--) {
     if (grid[y].every(cell => cell !== null)) {
-      grid.splice(y,1);
+      grid.splice(y, 1);
       grid.unshift(Array(cols).fill(null));
     }
   }
 }
 
 function tick() {
-  if (canMove(current.x, current.y + 1)) {
-    current.y++;
+  if (canMove(piece.x, piece.y + 1)) {
+    piece.y++;
   } else {
-    placePiece();
+    lockPiece();
     clearLines();
-    current = { x: Math.floor(cols/2), y: 0, shape: images[Math.floor(Math.random()*images.length)] };
-    if (!canMove(current.x, current.y)) {
+    piece = { x: Math.floor(cols / 2), y: 0, shape: emojis[Math.floor(Math.random() * emojis.length)] };
+    if (!canMove(piece.x, piece.y)) {
+      // Reset field when full
       for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) grid[y][x] = null;
     }
   }
-  drawGrid();
+  drawGrid(piece);
 }
 
-setInterval(tick, 900);
-    </script>
+/* Run the loop slowly for chill motion */
+setInterval(tick, 700);
+drawGrid(piece);
+</script>
