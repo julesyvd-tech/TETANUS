@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TETANUS</title>
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: black;
+    overflow: hidden;
+    font-family: "Press Start 2P", monospace;
+    color: #00ffcc;
+  }
+
+  /* Starfield */
+  canvas#stars {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+  }
+
+  /* CRT scanlines */
+  .crt::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom,
+      rgba(255,255,255,0.03) 0px,
+      rgba(255,255,255,0.03) 1px,
+      transparent 2px,
+      transparent 3px
+    );
+    mix-blend-mode: overlay;
+    z-index: 2;
+  }
+
+  /* Main container */
+  .screen {
+    position: relative;
+    width: 800px;
+    height: 600px;
+    margin: 40px auto;
+    border: 4px solid #00ffcc;
+    box-shadow: 0 0 20px #00ffcc66;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 1;
+  }
+
+  .header {
+    position: absolute;
+    top: 10px;
+    left: 20px;
+    font-size: 18px;
+    text-shadow: 0 0 6px #00ffcc;
+  }
+  .header small {
+    display: block;
+    margin-top: 10px;
+    font-size: 12px;
+  }
+
+  .side-box {
+    position: absolute;
+    top: 120px;
+    width: 120px;
+    height: 80px;
+    border: 2px solid #00ffcc;
+    padding: 10px;
+    text-align: center;
+  }
+
+  #uraBox { left: 20px; }
+  #nextBox { right: 20px; }
+
+  .ura-label { font-size: 16px; }
+  .ura-level { font-size: 24px; margin-top: 10px; }
+  .next-label { font-size: 16px; }
+
+  /* Score box */
+  #scoreBox {
+    position: absolute;
+    bottom: 60px;
+    right: 20px;
+    width: 120px;
+    height: 60px;
+    border: 2px solid #00ffcc;
+    padding: 10px;
+    text-align: center;
+  }
+  .score-label { font-size: 14px; }
+  .score-value { font-size: 20px; margin-top: 6px; }
+
+  /* Playfield placeholder */
+  #playfield {
+    position: absolute;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 300px;
+    height: 480px;
+    border: 2px solid #00ffcc;
+  }
+
+  /* Bottom controls */
+  .controls {
+    position: absolute;
+    bottom: 10px;
+    left: 20px;
+    font-size: 12px;
+    display: flex;
+    gap: 20px;
+  }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+</head>
+<body class="crt">
+
+<canvas id="stars"></canvas>
+
+<div class="screen">
+  <div class="header">
+    TETANUS
+    <small>TIME'S UP</small>
+  </div>
+
+  <div id="uraBox" class="side-box">
+    <div class="ura-label">U&nbsp;R&nbsp;A</div>
+    <div class="ura-level">0</div>
+  </div>
+
+  <div id="nextBox" class="side-box">
+    <div class="next-label">NEXT</div>
+  </div>
+
+  <div id="playfield"></div>
+
+  <div id="scoreBox">
+    <div class="score-label">SCORE</div>
+    <div class="score-value" id="scoreValue">0</div>
+  </div>
+
+  <div class="controls">
+    <div>NUMB</div>
+    <div>LIGHT</div>
+    <div>DROP</div>
+    <div>FADE</div>
+  </div>
+</div>
+
+<audio id="bgMusic" loop></audio>
+
+<script>
+/* --- Starfield --- */
+const canvas = document.getElementById('stars');
+const ctx = canvas.getContext('2d');
+let stars = [];
+function resize() {
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
+  stars = Array.from({length: 200}, () => ({
+    x: Math.random()*canvas.width,
+    y: Math.random()*canvas.height,
+    size: Math.random()*1.5,
+    speed: 0.1 + Math.random()*0.3
+  }));
+}
+window.addEventListener('resize', resize);
+resize();
+
+function drawStars() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = '#00ffcc';
+  stars.forEach(s => {
+    ctx.globalAlpha = 0.3 + Math.random()*0.7;
+    ctx.fillRect(s.x,s.y,s.size,s.size);
+    s.y += s.speed;
+    if (s.y > canvas.height) s.y = 0;
+  });
+  requestAnimationFrame(drawStars);
+}
+drawStars();
+
+/* --- Score decay --- */
+let score = 0;
+setInterval(() => {
+  score -= Math.floor(Math.random()*5);
+  document.getElementById('scoreValue').textContent = score;
+}, 800);
+
+/* --- Background music (root files) --- */
+const bg = document.getElementById('bgMusic');
+const tracks = [
+  "Bleep (mxd).wav",
+  "G U L P (mxd).wav"
+];
+let currentTrack = 0;
+function playMusic() {
+  bg.src = tracks[currentTrack];
+  bg.play().catch(()=>{});
+  bg.onended = () => {
+    currentTrack = (currentTrack + 1) % tracks.length;
+    playMusic();
+  };
+}
+document.body.addEventListener('click', () => {
+  bg.volume = 0.6;
+  playMusic();
+}, { once:true });
+</script>
+</body>
+</html>
+<script>
+/* --- Starfield --- */
+const canvas = document.getElementById('stars');
+const ctx = canvas.getContext('2d');
+let stars = [];
+function resize() {
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
+  stars = Array.from({length: 200}, () => ({
+    x: Math.random()*canvas.width,
+    y: Math.random()*canvas.height,
+    size: Math.random()*1.5,
+    speed: 0.1 + Math.random()*0.3
+  }));
+}
+window.addEventListener('resize', resize);
+resize();
+
+function drawStars() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = '#00ffcc';
+  stars.forEach(s => {
+    ctx.globalAlpha = 0.3 + Math.random()*0.7;
+    ctx.fillRect(s.x,s.y,s.size,s.size);
+    s.y += s.speed;
+    if (s.y > canvas.height) s.y = 0;
+  });
+  requestAnimationFrame(drawStars);
+}
+drawStars();
+
+/* --- Score decay --- */
+let score = 0;
+setInterval(() => {
+  score -= Math.floor(Math.random()*5);
+  document.getElementById('scoreValue').textContent = score;
+}, 800);
+
+/* --- Music --- */
+const bg = document.getElementById('bgMusic');
+const tracks = [
+  "Bleep (mxd).wav",
+  "G U L P (mxd).wav"
+];
+let currentTrack = 0;
+function playMusic() {
+  bg.src = tracks[currentTrack];
+  bg.play().catch(()=>{});
+  bg.onended = () => {
+    currentTrack = (currentTrack + 1) % tracks.length;
+    playMusic();
+  };
+}
+document.body.addEventListener('click', () => {
+  bg.volume = 0.6;
+  playMusic();
+}, { once:true });
+
+/* --- Tetanus falling pieces --- */
+const playfield = document.getElementById('playfield');
+const cols = 10, rows = 20;
+const grid = Array.from({length: rows}, () => Array(cols).fill(null));
+
+const images = [
+  "💊", // pill
+  "🚬", // cigarette
+  "🧪"  // pipe
+];
+
+const cellSize = 24;
+playfield.style.display = "grid";
+playfield.style.gridTemplateColumns = `repeat(${cols}, ${cellSize}px)`;
+playfield.style.gridTemplateRows = `repeat(${rows}, ${cellSize}px)`;
+playfield.style.justifyContent = "center";
+playfield.style.alignContent = "center";
+playfield.style.fontSize = "20px";
+
+function drawGrid() {
+  playfield.innerHTML = "";
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const cell = document.createElement("div");
+      cell.style.width = `${cellSize}px`;
+      cell.style.height = `${cellSize}px`;
+      cell.style.textAlign = "center";
+      cell.style.color = "#00ffcc";
+      cell.textContent = grid[y][x] || "";
+      playfield.appendChild(cell);
+    }
+  }
+}
+
+let current = {
+  x: Math.floor(cols/2),
+  y: 0,
+  shape: images[Math.floor(Math.random()*images.length)]
+};
+
+function canMove(x, y) {
+  return y < rows && !grid[y]?.[x];
+}
+
+function placePiece() {
+  grid[current.y][current.x] = current.shape;
+}
+
+function clearLines() {
+  for (let y = rows-1; y >= 0; y--) {
+    if (grid[y].every(cell => cell !== null)) {
+      grid.splice(y,1);
+      grid.unshift(Array(cols).fill(null));
+    }
+  }
+}
+
+function tick() {
+  if (canMove(current.x, current.y + 1)) {
+    current.y++;
+  } else {
+    placePiece();
+    clearLines();
+    current = { x: Math.floor(cols/2), y: 0, shape: images[Math.floor(Math.random()*images.length)] };
+    if (!canMove(current.x, current.y)) {
+      for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) grid[y][x] = null;
+    }
+  }
+  drawGrid();
+}
+
+setInterval(tick, 900);
+    </script>
