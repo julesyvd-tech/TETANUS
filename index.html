@@ -8,374 +8,141 @@
     html, body {
       margin: 0;
       padding: 0;
-      width: 100%;
       height: 100%;
-      overflow: hidden;
       background: black;
-      color: #f0f0f0;
+      color: #00ffcc;
       font-family: 'Courier New', monospace;
+      overflow: hidden;
     }
 
-    /* --- Starfield Background --- */
-    .stars {
+    /* CRT Scanline & Glow Effect */
+    body::after {
+      content: "";
       position: fixed;
-      width: 200%;
-      height: 200%;
-      background: radial-gradient(white 1px, transparent 1px) 0 0 / 3px 3px,
-                  radial-gradient(white 1px, transparent 1px) 1.5px 1.5px / 3px 3px;
-      opacity: 0.4;
-      animation: drift 120s linear infinite;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: repeating-linear-gradient(
+        rgba(255,255,255,0.03) 0px,
+        rgba(255,255,255,0.03) 1px,
+        rgba(0,0,0,0.02) 2px
+      );
+      pointer-events: none;
+      z-index: 50;
+      mix-blend-mode: overlay;
+      animation: flicker 0.15s infinite;
+    }
+
+    @keyframes flicker {
+      0%, 100% { opacity: 0.98; }
+      50% { opacity: 1; }
+    }
+
+    /* Starfield Canvas */
+    #stars {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
       z-index: 0;
     }
-    @keyframes drift {
-      from { transform: translate(0, 0); }
-      to { transform: translate(-200px, -200px); }
-    }
 
-    /* --- CRT Scanline Overlay --- */
-    .crt {
-      position: fixed;
+    /* Main Container */
+    #game-wrapper {
+      position: relative;
       width: 100%;
       height: 100%;
-      pointer-events: none;
-      background: repeating-linear-gradient(
-        to bottom,
-        rgba(255,255,255,0.02) 0px,
-        rgba(255,255,255,0.02) 1px,
-        rgba(0,0,0,0.06) 2px
-      );
-      mix-blend-mode: overlay;
-      z-index: 5;
-    }
-
-    /* --- Main Container --- */
-    .wrapper {
-      position: relative;
       display: flex;
       flex-direction: column;
-      align-items: center;
       justify-content: center;
-      height: 100vh;
+      align-items: center;
       z-index: 1;
-      text-align: center;
     }
 
-    /* --- Header Info --- */
-    .hud {
+    /* Title + Timer + Score HUD */
+    #hud {
       position: absolute;
-      top: 5%;
-      left: 5%;
-      font-size: 1rem;
+      top: 20px;
+      left: 20px;
       text-align: left;
+      z-index: 5;
     }
-    .hud h1 {
-      font-size: 1.5rem;
-      letter-spacing: 0.2em;
-      color: #f33;
-      margin: 0 0 0.2em 0;
+    #hud h1 {
+      font-size: 1.8em;
+      margin: 0;
+      color: #ff3366;
     }
-    .timer, .score {
-      color: #aaa;
-      margin: 0.1em 0;
+    #timer, #score {
+      font-size: 1em;
+      color: #00ffcc;
     }
 
-    /* --- Playfield Frame --- */
-    .playfield {
+    /* Game Field */
+    #playfield {
       position: relative;
-      width: 300px;
-      height: 540px;
-      background: rgba(10,10,10,0.9);
-      border: 3px solid rgba(255,255,255,0.3);
-      box-shadow: 0 0 30px rgba(255,255,255,0.2);
-      overflow: hidden;
+      background: rgba(0, 0, 0, 0.6);
+      border: 2px solid #00ffcc;
+      width: 260px;
+      height: 520px;
+      display: grid;
+      grid-template-rows: repeat(20, 1fr);
+      grid-template-columns: repeat(10, 1fr);
+      z-index: 2;
+      box-shadow: 0 0 20px rgba(0,255,200,0.4);
     }
 
-    /* --- Falling Pieces --- */
-    .piece {
-      position: absolute;
-      opacity: 0.9;
-      transition: transform 0.2s linear;
-      filter: blur(0.3px);
+    .cell {
+      width: 100%;
+      height: 100%;
     }
 
-    /* --- Score / Timer Style --- */
-    .scoreboard {
-      position: absolute;
-      right: 5%;
-      top: 5%;
-      text-align: right;
-      font-size: 1rem;
-      color: #ff3;
+    @keyframes blink {
+      50% { opacity: 0; }
     }
-
-    @media (max-width: 600px) {
-      .playfield {
-        width: 220px;
-        height: 400px;
-      }
+    .flash {
+      animation: blink 1s infinite;
     }
   </style>
 </head>
-
 <body>
-  <div class="stars"></div>
+  <canvas id="stars"></canvas>
 
-  <div class="wrapper">
-    <div class="hud">
+  <div id="game-wrapper">
+    <div id="hud">
       <h1>TETANUS</h1>
-      <div class="timer">TIME: <span id="timer">99:99</span></div>
+      <div id="timer">Time’sUp: 03:42</div>
+      <div id="score">Score: -000420</div>
     </div>
 
-    <div class="playfield" id="playfield"></div>
-
-    <div class="scoreboard">
-      SCORE<br><span id="score">-000001</span>
-    </div>
+    <div id="playfield"></div>
   </div>
 
-  <div class="crt"></div>
-</body>
-</html>
-<script>
-/* === FALLING PIECES + GAME CYCLE === */
-
-// --- Asset placeholders (can swap with real image URLs later)
-const pillImg = "https://upload.wikimedia.org/wikipedia/commons/thumb/8/85/Pill_icon.svg/64px-Pill_icon.svg.png";
-const cigImg  = "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Cigarette_icon.svg/64px-Cigarette_icon.svg.png";
-const pipeImg = "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Pipe_icon.svg/64px-Pipe_icon.svg.png";
-
-const pieceImages = [pillImg, cigImg, pipeImg];
-const playfield = document.getElementById("playfield");
-let fallingPieces = [];
-let dropInterval;
-let dropSpeed = 1600; // slower drop
-let score = -1;
-
-// --- Create ghosty piece ---
-function createPiece() {
-  const img = document.createElement("img");
-  img.src = pieceImages[Math.floor(Math.random() * pieceImages.length)];
-  img.classList.add("piece");
-
-  img.style.width = `${20 + Math.random() * 20}px`;
-  img.style.left = `${Math.random() * (playfield.clientWidth - 30)}px`;
-  img.style.top = "-40px";
-  img.style.opacity = 0.8 + Math.random() * 0.2;
-  img.style.filter = "blur(0.5px) brightness(1.1)";
-  playfield.appendChild(img);
-
-  fallingPieces.push(img);
-}
-
-// --- Drop pieces ---
-function dropPieces() {
-  for (let i = 0; i < fallingPieces.length; i++) {
-    const piece = fallingPieces[i];
-    let top = parseFloat(piece.style.top);
-    top += 3 + Math.random() * 1.5;
-    piece.style.top = `${top}px`;
-    piece.style.transform = `rotate(${Math.sin(Date.now()/400 + i) * 10}deg)`;
-
-    // Fade slightly as they fall
-    piece.style.opacity = Math.max(0.5, 0.9 - top / playfield.clientHeight);
-
-    // Remove offscreen pieces
-    if (top > playfield.clientHeight + 40) {
-      piece.remove();
-      fallingPieces.splice(i, 1);
-      i--;
-    }
-  }
-
-  // Game over check
-  if (fallingPieces.length > 80) {
-    triggerGameOver();
-  }
-}
-
-// --- Game loop controls ---
-function startDrop() {
-  createPiece();
-  dropInterval = setInterval(() => {
-    createPiece();
-    dropPieces();
-    updateScore();
-  }, dropSpeed);
-}
-
-function stopDrop() {
-  clearInterval(dropInterval);
-}
-
-function updateScore() {
-  score -= Math.floor(Math.random() * 9);
-  document.getElementById("score").textContent = score.toString().padStart(6, "0");
-}
-
-// --- Game over / restart ---
-const gameOverScreen = document.createElement("div");
-gameOverScreen.style.position = "absolute";
-gameOverScreen.style.top = 0;
-gameOverScreen.style.left = 0;
-gameOverScreen.style.width = "100%";
-gameOverScreen.style.height = "100%";
-gameOverScreen.style.display = "flex";
-gameOverScreen.style.alignItems = "center";
-gameOverScreen.style.justifyContent = "center";
-gameOverScreen.style.background = "rgba(0,0,0,0.8)";
-gameOverScreen.style.color = "#f33";
-gameOverScreen.style.fontFamily = "'Courier New', monospace";
-gameOverScreen.style.fontSize = "4vh";
-gameOverScreen.style.letterSpacing = "0.3em";
-gameOverScreen.style.opacity = "0";
-gameOverScreen.style.transition = "opacity 2s ease";
-gameOverScreen.style.zIndex = "1000";
-gameOverScreen.innerText = "GAME OVER";
-playfield.appendChild(gameOverScreen);
-
-function triggerGameOver() {
-  stopDrop();
-  gameOverScreen.style.opacity = "1";
-  playfield.style.boxShadow = "0 0 50px rgba(255,0,0,0.6)";
-  setTimeout(resetGame, 6000);
-}
-
-function resetGame() {
-  gameOverScreen.style.opacity = "0";
-  playfield.style.boxShadow = "0 0 30px rgba(255,255,255,0.2)";
-  fallingPieces.forEach(p => p.remove());
-  fallingPieces = [];
-  score = -1;
-  document.getElementById("score").textContent = "-000001";
-  startDrop();
-}
-
-// --- Timer countdown ---
-let timerVal = 666;
-function updateTimer() {
-  timerVal -= 1;
-  const minutes = String(Math.floor(timerVal / 60)).padStart(2, "0");
-  const seconds = String(timerVal % 60).padStart(2, "0");
-  document.getElementById("timer").textContent = `${minutes}:${seconds}`;
-  if (timerVal <= 0) timerVal = 666;
-}
-setInterval(updateTimer, 1000);
-
-// Start game after short delay
-setTimeout(startDrop, 1500);
-</script>
-<script>
-/* === AUDIO REACTIVE CRT + MUSIC LOOP === */
-
-// Paths to your audio (use your GitHub filenames exactly)
-const tracks = ["Bleep (mxd).wav", "G U L P (mxd).wav"];
-let currentTrack = 0;
-let audioCtx, analyser, source, dataArray;
-
-const audio = new Audio(tracks[currentTrack]);
-audio.loop = false; // play through first before looping both
-audio.volume = 0.7;
-audio.crossOrigin = "anonymous";
-audio.play().catch(() => console.log("User gesture may be required to start audio."));
-
-audio.addEventListener("ended", () => {
-  currentTrack = (currentTrack + 1) % tracks.length;
-  audio.src = tracks[currentTrack];
-  audio.play();
-});
-
-// Once both have played once, set loop true
-setTimeout(() => { audio.loop = true; }, 1000 * 60 * 10); // safe upper window
-
-// --- Audio context setup ---
-window.addEventListener("click", () => {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    source = audioCtx.createMediaElementSource(audio);
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 256;
-    dataArray = new Uint8Array(analyser.frequencyBinCount);
-    source.connect(analyser);
-    analyser.connect(audioCtx.destination);
-    console.log("Audio context started");
-  }
-  audio.play();
-});
-
-// --- CRT Overlay Setup ---
-const crtOverlay = document.createElement("div");
-crtOverlay.style.position = "fixed";
-crtOverlay.style.top = "0";
-crtOverlay.style.left = "0";
-crtOverlay.style.width = "100%";
-crtOverlay.style.height = "100%";
-crtOverlay.style.pointerEvents = "none";
-crtOverlay.style.background = `
-  repeating-linear-gradient(
-    to bottom,
-    rgba(255,255,255,0.03) 0px,
-    rgba(255,255,255,0.03) 1px,
-    rgba(0,0,0,0.05) 2px
-  )
-`;
-crtOverlay.style.mixBlendMode = "overlay";
-crtOverlay.style.zIndex = "999";
-document.body.appendChild(crtOverlay);
-
-let vhsRoll = 0;
-
-function animateCRT() {
-  requestAnimationFrame(animateCRT);
-  vhsRoll += 0.0003;
-
-  // Base flicker
-  const baseFlicker = 0.95 + Math.sin(vhsRoll * 80) * 0.03 + (Math.random() - 0.5) * 0.02;
-  let pulse = 0;
-
-  if (analyser && dataArray) {
-    analyser.getByteFrequencyData(dataArray);
-    const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-    pulse = avg / 255;
-  }
-
-  // Apply soft brightness and contrast shifts
-  const brightness = baseFlicker + pulse * 0.3;
-  const contrast = 1 + pulse * 0.1;
-  document.body.style.filter = `brightness(${brightness}) contrast(${contrast})`;
-  crtOverlay.style.opacity = 0.4 + pulse * 0.2;
-
-  // Slow VHS drift
-  document.body.style.backgroundPositionY = `${Math.sin(vhsRoll) * 20}px`;
-}
-
-animateCRT();
   <script>
-// === SPEED PATCH ===
-// this section overrides the existing drop timing to control how fast the pieces fall
+  // === STARFIELD EFFECT ===
+  const canvas = document.getElementById("stars");
+  const ctx = canvas.getContext("2d");
+  let stars = [];
 
-let fallSpeed = 0.5; // default speed (lower = slower, higher = faster)
-let lastDrop = 0;
-
-function updateGame(time = 0) {
-  const delta = time - lastDrop;
-  
-  // adjust 1000 / fallSpeed for drop interval in ms
-  if (delta > 1000 / fallSpeed) {
-    if (currentPiece) {
-      currentPiece.y += 1; // move down one grid step
-    }
-    lastDrop = time;
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    stars = Array.from({length: 200}, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      r: Math.random() * 1.2
+    }));
   }
+  window.addEventListener("resize", resizeCanvas);
+  resizeCanvas();
 
-  // draw and loop
-  drawBoard();
-  drawPiece(currentPiece);
-  requestAnimationFrame(updateGame);
-}
-
-// start animation loop
-requestAnimationFrame(updateGame);
-
-// you can change this number live in console to speed/slow down
-// for example: fallSpeed = 1.2
-</script>
+  function drawStars() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "white";
+    for (let s of stars) {
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+      s.y += 0.15;
+      if (s.y > canvas.height) s.y = 0;
+    }
+    requestAnimationFrame(drawStars);
+  }
+  drawStars();
+  </script>
