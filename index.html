@@ -189,3 +189,141 @@ document.body.addEventListener("click", () => {
 </script>
 </body>
 </html>
+<script>
+/* --- Falling Object Simulation --- */
+const playfield = document.getElementById("playfield");
+const cols = 10;
+const rows = 20;
+let grid = Array.from({ length: rows }, () => Array(cols).fill(null));
+
+const icons = ["💊", "🚬", "🧪"];
+const colors = ["#ff66cc", "#ffaa00", "#66ccff"];
+let fallingPieces = [];
+
+function spawnPiece() {
+  const col = Math.floor(Math.random() * cols);
+  const icon = icons[Math.floor(Math.random() * icons.length)];
+  const color = colors[icons.indexOf(icon)];
+  fallingPieces.push({ x: col, y: 0, icon, color });
+}
+
+function renderGrid() {
+  playfield.innerHTML = "";
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const div = document.createElement("div");
+      div.style.width = "100%";
+      div.style.height = "100%";
+      div.style.display = "flex";
+      div.style.alignItems = "center";
+      div.style.justifyContent = "center";
+      div.style.fontSize = "14px";
+      div.textContent = grid[y][x]?.icon || "";
+      div.style.color = grid[y][x]?.color || "#00ffcc33";
+      playfield.appendChild(div);
+    }
+  }
+  for (const p of fallingPieces) {
+    const i = p.y * cols + p.x;
+    if (i >= 0 && i < rows * cols) {
+      const div = playfield.children[i];
+      div.textContent = p.icon;
+      div.style.color = p.color;
+    }
+  }
+}
+
+function updatePieces() {
+  for (const p of fallingPieces) {
+    const nextY = p.y + 1;
+    if (nextY >= rows || grid[nextY][p.x]) {
+      grid[p.y][p.x] = { icon: p.icon, color: p.color };
+      fallingPieces = fallingPieces.filter(f => f !== p);
+    } else {
+      p.y++;
+    }
+  }
+}
+
+function clearLines() {
+  let cleared = 0;
+  for (let y = rows - 1; y >= 0; y--) {
+    if (grid[y].every(cell => cell !== null)) {
+      cleared++;
+      grid.splice(y, 1);
+      grid.unshift(Array(cols).fill(null));
+      y++;
+    }
+  }
+  if (cleared > 0) {
+    document.getElementById("playfield").style.borderColor = "#ff66cc";
+    setTimeout(() => {
+      document.getElementById("playfield").style.borderColor = "#00ffcc";
+    }, 300);
+  }
+}
+
+function loop() {
+  if (Math.random() < 0.08) spawnPiece();
+  updatePieces();
+  renderGrid();
+  clearLines();
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+<style>
+/* --- CRT / VHS Overlays --- */
+.crt-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    rgba(255, 255, 255, 0.03) 0px,
+    rgba(0, 0, 0, 0.03) 2px
+  );
+  mix-blend-mode: overlay;
+  animation: flicker 1.8s infinite;
+  z-index: 50;
+}
+
+@keyframes flicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+    opacity: 0.04;
+  }
+  20%, 24%, 55% {
+    opacity: 0.12;
+  }
+}
+
+/* --- Subtle VHS Wobble --- */
+.vhs-warp {
+  animation: vhsDrift 6s ease-in-out infinite alternate;
+}
+
+@keyframes vhsDrift {
+  0% {
+    transform: translateX(-2px) translateY(-1px) scale(1.001) rotate(-0.1deg);
+    filter: hue-rotate(0deg);
+  }
+  50% {
+    transform: translateX(2px) translateY(1px) scale(1.002) rotate(0.1deg);
+    filter: hue-rotate(2deg);
+  }
+  100% {
+    transform: translateX(-1px) translateY(0px) scale(1.001) rotate(0deg);
+    filter: hue-rotate(-1deg);
+  }
+}
+</style>
+
+<script>
+/* --- Apply drift and flicker layers --- */
+const mainContainer = document.querySelector(".container");
+mainContainer.classList.add("vhs-warp");
+
+const crt = document.createElement("div");
+crt.className = "crt-overlay";
+document.body.appendChild(crt);
+</script>
