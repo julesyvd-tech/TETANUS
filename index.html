@@ -4,157 +4,122 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>TETANUS</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
 <style>
   html, body {
     margin: 0;
-    height: 100%;
+    padding: 0;
     background: black;
     overflow: hidden;
+    height: 100%;
     font-family: "Press Start 2P", monospace;
     color: #00ffcc;
   }
 
-  /* Starfield */
+  /* --- Starfield --- */
   canvas#stars {
     position: fixed;
     inset: 0;
     z-index: 0;
   }
 
-  /* CRT scanlines */
-  .crt::after {
+  /* --- CRT scanlines --- */
+  body::after {
     content: "";
     position: fixed;
     inset: 0;
     pointer-events: none;
     background: repeating-linear-gradient(
       to bottom,
-      rgba(255,255,255,0.03) 0px,
-      rgba(255,255,255,0.03) 1px,
+      rgba(255,255,255,0.04) 0px,
+      rgba(255,255,255,0.04) 1px,
       transparent 2px,
       transparent 3px
     );
     mix-blend-mode: overlay;
-    z-index: 2;
+    z-index: 3;
   }
 
-  /* Main container */
-  .screen {
-    position: relative;
-    width: 800px;
-    height: 600px;
-    margin: 40px auto;
-    border: 4px solid #00ffcc;
-    box-shadow: 0 0 20px #00ffcc66;
-    background: rgba(0, 0, 0, 0.4);
+  /* --- Overlay HUD --- */
+  .hud {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    font-size: 10px;
+    z-index: 2;
+    text-shadow: 0 0 5px #00ffcc;
+  }
+  .hud h1 {
+    font-size: 14px;
+    margin: 0 0 4px 0;
+  }
+  .timer {
+    font-size: 12px;
+    margin-top: 2px;
+  }
+
+  .scoreBox {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    border: 2px solid #00ffcc;
+    padding: 6px;
+    font-size: 10px;
+    text-align: center;
+    width: 90px;
+    z-index: 2;
+  }
+  .scoreBox span {
+    display: block;
+    margin-top: 4px;
+    font-size: 14px;
+  }
+
+  /* --- Playfield --- */
+  #playfield {
+    position: absolute;
+    top: 55%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 280px;
+    height: 480px;
+    border: 2px solid #00ffcc;
+    box-shadow: 0 0 12px #00ffcc55;
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    grid-template-rows: repeat(20, 1fr);
+    gap: 1px;
     z-index: 1;
   }
 
-  .header {
-    position: absolute;
-    top: 10px;
-    left: 20px;
-    font-size: 18px;
-    text-shadow: 0 0 6px #00ffcc;
-  }
-  .header small {
-    display: block;
-    margin-top: 10px;
-    font-size: 12px;
-  }
-
-  .side-box {
-    position: absolute;
-    top: 120px;
-    width: 120px;
-    height: 80px;
-    border: 2px solid #00ffcc;
-    padding: 10px;
-    text-align: center;
-  }
-
-  #uraBox { left: 20px; }
-  #nextBox { right: 20px; }
-
-  .ura-label { font-size: 16px; }
-  .ura-level { font-size: 24px; margin-top: 10px; }
-  .next-label { font-size: 16px; }
-
-  /* Score box */
-  #scoreBox {
-    position: absolute;
-    bottom: 60px;
-    right: 20px;
-    width: 120px;
-    height: 60px;
-    border: 2px solid #00ffcc;
-    padding: 10px;
-    text-align: center;
-  }
-  .score-label { font-size: 14px; }
-  .score-value { font-size: 20px; margin-top: 6px; }
-
-  /* Playfield placeholder */
-  #playfield {
-    position: absolute;
-    top: 80px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 300px;
-    height: 480px;
-    border: 2px solid #00ffcc;
-  }
-
-  /* Bottom controls */
-  .controls {
-    position: absolute;
-    bottom: 10px;
-    left: 20px;
-    font-size: 12px;
-    display: flex;
-    gap: 20px;
+  @media (max-width: 600px) {
+    #playfield {
+      width: 180px;
+      height: 320px;
+    }
+    .hud, .scoreBox { font-size: 8px; }
   }
 </style>
-<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 </head>
-<body class="crt">
-
+<body>
 <canvas id="stars"></canvas>
 
-<div class="screen">
-  <div class="header">
-    TETANUS
-    <small>TIME'S UP</small>
-  </div>
+<div class="hud">
+  <h1>TETANUS</h1>
+  <div id="timer" class="timer">04:12</div>
+</div>
 
-  <div id="uraBox" class="side-box">
-    <div class="ura-label">U&nbsp;R&nbsp;A</div>
-    <div class="ura-level">0</div>
-  </div>
+<div id="playfield"></div>
 
-  <div id="nextBox" class="side-box">
-    <div class="next-label">NEXT</div>
-  </div>
-
-  <div id="playfield"></div>
-
-  <div id="scoreBox">
-    <div class="score-label">SCORE</div>
-    <div class="score-value" id="scoreValue">0</div>
-  </div>
-
-  <div class="controls">
-    <div>NUMB</div>
-    <div>LIGHT</div>
-    <div>DROP</div>
-    <div>FADE</div>
-  </div>
+<div class="scoreBox">
+  SCORE
+  <span id="scoreValue">0</span>
 </div>
 
 <audio id="bgMusic" loop></audio>
 
 <script>
-/* --- Starfield --- */
+/* --- Starfield animation --- */
 const canvas = document.getElementById('stars');
 const ctx = canvas.getContext('2d');
 let stars = [];
@@ -162,41 +127,52 @@ function resize() {
   canvas.width = innerWidth;
   canvas.height = innerHeight;
   stars = Array.from({length: 200}, () => ({
-    x: Math.random()*canvas.width,
-    y: Math.random()*canvas.height,
-    size: Math.random()*1.5,
-    speed: 0.1 + Math.random()*0.3
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    s: Math.random() * 1.5,
+    v: 0.1 + Math.random() * 0.3
   }));
 }
 window.addEventListener('resize', resize);
 resize();
 
 function drawStars() {
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle = '#00ffcc';
-  stars.forEach(s => {
-    ctx.globalAlpha = 0.3 + Math.random()*0.7;
-    ctx.fillRect(s.x,s.y,s.size,s.size);
-    s.y += s.speed;
-    if (s.y > canvas.height) s.y = 0;
-  });
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#00ffcc";
+  for (const star of stars) {
+    ctx.globalAlpha = 0.3 + Math.random() * 0.7;
+    ctx.fillRect(star.x, star.y, star.s, star.s);
+    star.y += star.v;
+    if (star.y > canvas.height) star.y = 0;
+  }
   requestAnimationFrame(drawStars);
 }
 drawStars();
 
-/* --- Score decay --- */
+/* --- Score slowly decreasing --- */
 let score = 0;
 setInterval(() => {
-  score -= Math.floor(Math.random()*5);
-  document.getElementById('scoreValue').textContent = score;
-}, 800);
+  score -= Math.floor(Math.random() * 3);
+  document.getElementById("scoreValue").textContent = score;
+}, 1000);
 
-/* --- Background music (root files) --- */
-const bg = document.getElementById('bgMusic');
-const tracks = [
-  "Bleep (mxd).wav",
-  "G U L P (mxd).wav"
-];
+/* --- Timer countdown --- */
+let minutes = 4, seconds = 12;
+const timerEl = document.getElementById("timer");
+setInterval(() => {
+  if (minutes === 0 && seconds === 0) {
+    timerEl.textContent = "00:00";
+    timerEl.style.opacity = Math.sin(Date.now()/200) > 0 ? 1 : 0.4;
+    return;
+  }
+  if (seconds === 0) { minutes--; seconds = 59; }
+  else seconds--;
+  timerEl.textContent = `${String(minutes).padStart(2,"0")}:${String(seconds).padStart(2,"0")}`;
+}, 1200);
+
+/* --- Music loop --- */
+const bg = document.getElementById("bgMusic");
+const tracks = ["Bleep (mxd).wav", "G U L P (mxd).wav"];
 let currentTrack = 0;
 function playMusic() {
   bg.src = tracks[currentTrack];
@@ -206,148 +182,10 @@ function playMusic() {
     playMusic();
   };
 }
-document.body.addEventListener('click', () => {
+document.body.addEventListener("click", () => {
   bg.volume = 0.6;
   playMusic();
-}, { once:true });
+}, { once: true });
 </script>
 </body>
 </html>
-<script>
-/* --- Starfield --- */
-const canvas = document.getElementById('stars');
-const ctx = canvas.getContext('2d');
-let stars = [];
-function resize() {
-  canvas.width = innerWidth;
-  canvas.height = innerHeight;
-  stars = Array.from({length: 200}, () => ({
-    x: Math.random()*canvas.width,
-    y: Math.random()*canvas.height,
-    size: Math.random()*1.5,
-    speed: 0.1 + Math.random()*0.3
-  }));
-}
-window.addEventListener('resize', resize);
-resize();
-
-function drawStars() {
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle = '#00ffcc';
-  stars.forEach(s => {
-    ctx.globalAlpha = 0.3 + Math.random()*0.7;
-    ctx.fillRect(s.x,s.y,s.size,s.size);
-    s.y += s.speed;
-    if (s.y > canvas.height) s.y = 0;
-  });
-  requestAnimationFrame(drawStars);
-}
-drawStars();
-
-/* --- Score decay --- */
-let score = 0;
-setInterval(() => {
-  score -= Math.floor(Math.random()*5);
-  document.getElementById('scoreValue').textContent = score;
-}, 800);
-
-/* --- Background music --- */
-const bg = document.getElementById('bgMusic');
-const tracks = [
-  "Bleep (mxd).wav",
-  "G U L P (mxd).wav"
-];
-let currentTrack = 0;
-function playMusic() {
-  bg.src = tracks[currentTrack];
-  bg.play().catch(()=>{});
-  bg.onended = () => {
-    currentTrack = (currentTrack + 1) % tracks.length;
-    playMusic();
-  };
-}
-document.body.addEventListener('click', () => {
-  bg.volume = 0.6;
-  playMusic();
-}, { once:true });
-
-/* --- Falling pieces --- */
-const playfield = document.getElementById('playfield');
-const cols = 10, rows = 20;
-const grid = Array.from({ length: rows }, () => Array(cols).fill(null));
-
-const emojis = ["💊", "🚬", "🧪"];
-const cellSize = 24;
-
-/* Proper centering + grid render */
-playfield.style.display = "grid";
-playfield.style.gridTemplateColumns = `repeat(${cols}, ${cellSize}px)`;
-playfield.style.gridTemplateRows = `repeat(${rows}, ${cellSize}px)`;
-playfield.style.placeItems = "center";
-playfield.style.justifyContent = "center";
-playfield.style.alignContent = "center";
-playfield.style.fontSize = "20px";
-playfield.style.lineHeight = `${cellSize}px`;
-
-function drawGrid(currentPiece) {
-  playfield.innerHTML = "";
-  for (let y = 0; y < rows; y++) {
-    for (let x = 0; x < cols; x++) {
-      const div = document.createElement("div");
-      div.style.width = `${cellSize}px`;
-      div.style.height = `${cellSize}px`;
-      div.style.textAlign = "center";
-      div.style.color = "#00ffcc";
-      div.textContent = grid[y][x] || "";
-      playfield.appendChild(div);
-    }
-  }
-  if (currentPiece) {
-    const idx = currentPiece.y * cols + currentPiece.x;
-    playfield.children[idx].textContent = currentPiece.shape;
-  }
-}
-
-/* Piece logic */
-let piece = {
-  x: Math.floor(cols / 2),
-  y: 0,
-  shape: emojis[Math.floor(Math.random() * emojis.length)]
-};
-
-function canMove(x, y) {
-  return y < rows && !grid[y]?.[x];
-}
-
-function lockPiece() {
-  grid[piece.y][piece.x] = piece.shape;
-}
-
-function clearLines() {
-  for (let y = rows - 1; y >= 0; y--) {
-    if (grid[y].every(cell => cell !== null)) {
-      grid.splice(y, 1);
-      grid.unshift(Array(cols).fill(null));
-    }
-  }
-}
-
-function tick() {
-  if (canMove(piece.x, piece.y + 1)) {
-    piece.y++;
-  } else {
-    lockPiece();
-    clearLines();
-    piece = { x: Math.floor(cols / 2), y: 0, shape: emojis[Math.floor(Math.random() * emojis.length)] };
-    if (!canMove(piece.x, piece.y)) {
-      // Reset field when full
-      for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) grid[y][x] = null;
-    }
-  }
-  drawGrid(piece);
-}
-
-/* Run the loop slowly for chill motion */
-setInterval(tick, 700);
-drawGrid(piece);
-</script>
