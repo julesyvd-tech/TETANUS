@@ -1,229 +1,194 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TETANUS</title>
-<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+
 <style>
-  html, body {
-    margin: 0;
-    padding: 0;
-    background: black;
-    overflow: hidden;
-    height: 100%;
-    font-family: "Press Start 2P", monospace;
-    color: #00ffcc;
-  }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: black;
+  overflow: hidden;
+  color: #00ffcc;
+  font-family: 'Courier New', monospace;
+  height: 100%;
+}
 
-  /* --- Starfield --- */
-  canvas#stars {
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-  }
+/* --- Starfield --- */
+#stars {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(black, #010a0f 80%);
+  overflow: hidden;
+  z-index: 0;
+}
+.star {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  background: white;
+  opacity: 0.5;
+  animation: twinkle 4s infinite ease-in-out;
+}
+@keyframes twinkle {
+  0%,100% {opacity: 0.2;}
+  50% {opacity: 0.8;}
+}
 
-  /* --- CRT scanlines --- */
-  body::after {
-    content: "";
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    background: repeating-linear-gradient(
-      to bottom,
-      rgba(255,255,255,0.04) 0px,
-      rgba(255,255,255,0.04) 1px,
-      transparent 2px,
-      transparent 3px
-    );
-    mix-blend-mode: overlay;
-    z-index: 3;
-  }
+/* --- Layout --- */
+.container {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
 
-  /* --- Overlay HUD --- */
-  .hud {
-    position: fixed;
-    top: 10px;
-    left: 10px;
-    font-size: 10px;
-    z-index: 2;
-    text-shadow: 0 0 5px #00ffcc;
-  }
-  .hud h1 {
-    font-size: 14px;
-    margin: 0 0 4px 0;
-  }
-  .timer {
-    font-size: 12px;
-    margin-top: 2px;
-  }
+/* --- Header UI --- */
+.hud {
+  position: absolute;
+  top: 2vh;
+  left: 2vw;
+  text-align: left;
+  font-size: 1rem;
+  line-height: 1.4;
+  color: #9df;
+}
+.hud .title {
+  font-size: 1.4rem;
+  letter-spacing: 2px;
+  color: #f4a;
+}
+.hud .timer {
+  font-size: 1rem;
+  color: #faa;
+  opacity: 0.8;
+}
+.hud .score {
+  margin-top: 1vh;
+  color: #00ffcc;
+}
 
-  .scoreBox {
-    position: fixed;
-    top: 10px;
-    right: 10px;
-    border: 2px solid #00ffcc;
-    padding: 6px;
-    font-size: 10px;
-    text-align: center;
-    width: 90px;
-    z-index: 2;
-  }
-  .scoreBox span {
-    display: block;
-    margin-top: 4px;
-    font-size: 14px;
-  }
+/* --- Playfield --- */
+#playfield {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  grid-template-rows: repeat(20, 1fr);
+  width: min(80vw, 300px);
+  aspect-ratio: 10/20;
+  border: 2px solid #00ffcc;
+  box-shadow: 0 0 8px #00ffcc33;
+  position: relative;
+  background: rgba(0, 0, 0, 0.3);
+}
 
-  /* --- Playfield --- */
-  #playfield {
-    position: absolute;
-    top: 55%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 280px;
-    height: 480px;
-    border: 2px solid #00ffcc;
-    box-shadow: 0 0 12px #00ffcc55;
-    display: grid;
-    grid-template-columns: repeat(10, 1fr);
-    grid-template-rows: repeat(20, 1fr);
-    gap: 1px;
-    z-index: 1;
-  }
-
-  @media (max-width: 600px) {
-    #playfield {
-      width: 180px;
-      height: 320px;
-    }
-    .hud, .scoreBox { font-size: 8px; }
-  }
+/* --- CRT Overlay --- */
+.crt {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    rgba(255,255,255,0.03) 0px,
+    rgba(0,0,0,0.03) 2px
+  );
+  mix-blend-mode: overlay;
+  z-index: 5;
+  animation: flicker 1.8s infinite;
+}
+@keyframes flicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {opacity: 0.04;}
+  20%, 24%, 55% {opacity: 0.12;}
+}
 </style>
 </head>
 <body>
-<canvas id="stars"></canvas>
 
-<div class="hud">
-  <h1>TETANUS</h1>
-  <div id="timer" class="timer">04:12</div>
+<div id="stars"></div>
+
+<div class="container">
+  <div class="hud">
+    <div class="title">TETANUS</div>
+    <div class="timer" id="timer">Time’s Up 00:00</div>
+    <div class="score">SCORE −000000</div>
+    <div style="margin-top:1rem;">U R A<br>0</div>
+  </div>
+
+  <div id="playfield"></div>
 </div>
 
-<div id="playfield"></div>
-
-<div class="scoreBox">
-  SCORE
-  <span id="scoreValue">0</span>
-</div>
-
-<audio id="bgMusic" loop></audio>
+<div class="crt"></div>
 
 <script>
-/* --- Starfield animation --- */
-const canvas = document.getElementById('stars');
-const ctx = canvas.getContext('2d');
-let stars = [];
-function resize() {
-  canvas.width = innerWidth;
-  canvas.height = innerHeight;
-  stars = Array.from({length: 200}, () => ({
-    x: Math.random() * canvas.width,
-    y: Math.random() * canvas.height,
-    s: Math.random() * 1.5,
-    v: 0.1 + Math.random() * 0.3
-  }));
+/* --- Starfield generator --- */
+const starContainer = document.getElementById('stars');
+for(let i=0;i<100;i++){
+  const s=document.createElement('div');
+  s.className='star';
+  s.style.left=Math.random()*100+'%';
+  s.style.top=Math.random()*100+'%';
+  s.style.animationDelay=(Math.random()*4)+'s';
+  starContainer.appendChild(s);
 }
-window.addEventListener('resize', resize);
-resize();
-
-function drawStars() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "#00ffcc";
-  for (const star of stars) {
-    ctx.globalAlpha = 0.3 + Math.random() * 0.7;
-    ctx.fillRect(star.x, star.y, star.s, star.s);
-    star.y += star.v;
-    if (star.y > canvas.height) star.y = 0;
-  }
-  requestAnimationFrame(drawStars);
-}
-drawStars();
-
-/* --- Score slowly decreasing --- */
-let score = 0;
-setInterval(() => {
-  score -= Math.floor(Math.random() * 3);
-  document.getElementById("scoreValue").textContent = score;
-}, 1000);
 
 /* --- Timer countdown --- */
-let minutes = 4, seconds = 12;
-const timerEl = document.getElementById("timer");
-setInterval(() => {
-  if (minutes === 0 && seconds === 0) {
-    timerEl.textContent = "00:00";
-    timerEl.style.opacity = Math.sin(Date.now()/200) > 0 ? 1 : 0.4;
-    return;
-  }
-  if (seconds === 0) { minutes--; seconds = 59; }
-  else seconds--;
-  timerEl.textContent = `${String(minutes).padStart(2,"0")}:${String(seconds).padStart(2,"0")}`;
-}, 1200);
-
-/* --- Music loop --- */
-const bg = document.getElementById("bgMusic");
-const tracks = ["Bleep (mxd).wav", "G U L P (mxd).wav"];
-let currentTrack = 0;
-function playMusic() {
-  bg.src = tracks[currentTrack];
-  bg.play().catch(()=>{});
-  bg.onended = () => {
-    currentTrack = (currentTrack + 1) % tracks.length;
-    playMusic();
-  };
+let seconds = 300;
+function updateTimer(){
+  seconds--;
+  if(seconds<=0){seconds=0;}
+  const m = String(Math.floor(seconds/60)).padStart(2,'0');
+  const s = String(seconds%60).padStart(2,'0');
+  document.getElementById('timer').textContent=`Time’s Up ${m}:${s}`;
+  if(seconds===0){document.getElementById('timer').textContent='Time’s Up 00:00';}
 }
-document.body.addEventListener("click", () => {
-  bg.volume = 0.6;
-  playMusic();
-}, { once: true });
+setInterval(updateTimer,1000);
 </script>
+
 </body>
 </html>
 <script>
-/* --- Falling Object Simulation --- */
-const playfield = document.getElementById("playfield");
-const cols = 10;
-const rows = 20;
-let grid = Array.from({ length: rows }, () => Array(cols).fill(null));
+/* === FALLING OBJECT LOOP === */
 
-const icons = ["💊", "🚬", "🧪"];
-const colors = ["#ff66cc", "#ffaa00", "#66ccff"];
-let fallingPieces = [];
+const playfield = document.getElementById("playfield");
+const cols = 10, rows = 20;
+let grid = Array.from({ length: rows }, () => Array(cols).fill(null));
+let activePieces = [];
+let score = 0;
+let falling = true;
+
+/* --- Stylized objects (simple text placeholders, will later be small pixel sprites) --- */
+const pieces = [
+  { icon: "💊", color: "#f4a" },
+  { icon: "🚬", color: "#ffaa00" },
+  { icon: "🧪", color: "#9df" }
+];
 
 function spawnPiece() {
+  const piece = pieces[Math.floor(Math.random() * pieces.length)];
   const col = Math.floor(Math.random() * cols);
-  const icon = icons[Math.floor(Math.random() * icons.length)];
-  const color = colors[icons.indexOf(icon)];
-  fallingPieces.push({ x: col, y: 0, icon, color });
+  activePieces.push({ ...piece, x: col, y: 0, vy: 0 });
 }
 
 function renderGrid() {
   playfield.innerHTML = "";
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
-      const div = document.createElement("div");
-      div.style.width = "100%";
-      div.style.height = "100%";
-      div.style.display = "flex";
-      div.style.alignItems = "center";
-      div.style.justifyContent = "center";
-      div.style.fontSize = "14px";
-      div.textContent = grid[y][x]?.icon || "";
-      div.style.color = grid[y][x]?.color || "#00ffcc33";
-      playfield.appendChild(div);
+      const cell = document.createElement("div");
+      cell.style.display = "flex";
+      cell.style.alignItems = "center";
+      cell.style.justifyContent = "center";
+      cell.style.fontSize = "1rem";
+      cell.style.color = grid[y][x]?.color || "transparent";
+      cell.textContent = grid[y][x]?.icon || "";
+      playfield.appendChild(cell);
     }
   }
-  for (const p of fallingPieces) {
+  for (const p of activePieces) {
     const i = p.y * cols + p.x;
     if (i >= 0 && i < rows * cols) {
       const div = playfield.children[i];
@@ -233,18 +198,21 @@ function renderGrid() {
   }
 }
 
-function updatePieces() {
-  for (const p of fallingPieces) {
-    const nextY = p.y + 1;
-    if (nextY >= rows || grid[nextY][p.x]) {
-      grid[p.y][p.x] = { icon: p.icon, color: p.color };
-      fallingPieces = fallingPieces.filter(f => f !== p);
+function updatePieces(dt) {
+  const fallSpeed = 0.5; // 50% slower
+  for (const p of activePieces) {
+    p.vy += fallSpeed * dt * 0.001;
+    const nextY = Math.floor(p.y + p.vy);
+    if (nextY >= rows - 1 || grid[nextY + 1][p.x]) {
+      grid[Math.min(rows - 1, nextY)][p.x] = { icon: p.icon, color: p.color };
+      activePieces = activePieces.filter(f => f !== p);
     } else {
-      p.y++;
+      p.y += fallSpeed * dt * 0.001;
     }
   }
 }
 
+/* --- Detect and clear lines --- */
 function clearLines() {
   let cleared = 0;
   for (let y = rows - 1; y >= 0; y--) {
@@ -256,74 +224,264 @@ function clearLines() {
     }
   }
   if (cleared > 0) {
-    document.getElementById("playfield").style.borderColor = "#ff66cc";
+    score -= cleared * 100;
+    flashBorder();
+  }
+  document.querySelector(".score").textContent = `SCORE −${Math.abs(score).toString().padStart(6,"0")}`;
+}
+
+function flashBorder() {
+  playfield.style.borderColor = "#f4a";
+  setTimeout(() => { playfield.style.borderColor = "#00ffcc"; }, 400);
+}
+
+/* --- Game Over / Reset --- */
+function checkGameOver() {
+  if (grid[0].some(cell => cell)) {
+    falling = false;
+    const overlay = document.createElement("div");
+    overlay.style.position = "absolute";
+    overlay.style.inset = "0";
+    overlay.style.display = "flex";
+    overlay.style.alignItems = "center";
+    overlay.style.justifyContent = "center";
+    overlay.style.color = "#f4a";
+    overlay.style.fontSize = "1.4rem";
+    overlay.style.background = "rgba(0,0,0,0.7)";
+    overlay.textContent = "GAME OVER";
+    playfield.appendChild(overlay);
     setTimeout(() => {
-      document.getElementById("playfield").style.borderColor = "#00ffcc";
-    }, 300);
+      grid = Array.from({ length: rows }, () => Array(cols).fill(null));
+      activePieces = [];
+      falling = true;
+      overlay.remove();
+    }, 3000);
   }
 }
 
-function loop() {
-  if (Math.random() < 0.08) spawnPiece();
-  updatePieces();
+/* --- Main loop --- */
+let lastTime = performance.now();
+function loop(now) {
+  const dt = now - lastTime;
+  lastTime = now;
+  if (falling) {
+    if (Math.random() < 0.01) spawnPiece();
+    updatePieces(dt);
+    clearLines();
+    checkGameOver();
+  }
   renderGrid();
-  clearLines();
   requestAnimationFrame(loop);
 }
-
-loop();
+loop(performance.now());
 </script>
 <style>
-/* --- CRT / VHS Overlays --- */
-.crt-overlay {
+/* === VHS / CRT EFFECTS === */
+
+/* Subtle hue-shift drift for that analog warmth */
+.vhs-hue {
+  animation: hueDrift 12s ease-in-out infinite alternate;
+}
+@keyframes hueDrift {
+  0% { filter: hue-rotate(0deg) saturate(1); }
+  50% { filter: hue-rotate(8deg) saturate(1.1); }
+  100% { filter: hue-rotate(-8deg) saturate(0.9); }
+}
+
+/* Slight scale + tilt jitter (old camera feel) */
+.vhs-wobble {
+  animation: camDrift 9s ease-in-out infinite alternate;
+}
+@keyframes camDrift {
+  0% { transform: translate(-1px, -1px) rotate(-0.2deg) scale(1.001); }
+  50% { transform: translate(1px, 1px) rotate(0.2deg) scale(1.002); }
+  100% { transform: translate(-0.5px, 0.5px) rotate(0deg) scale(1.001); }
+}
+
+/* Random flicker to mimic unstable video signal */
+.crt-flicker {
+  animation: flickerPulse 2.8s infinite;
+}
+@keyframes flickerPulse {
+  0%, 5%, 95%, 100% { opacity: 0.05; }
+  20%, 50%, 75% { opacity: 0.1; }
+  25%, 55% { opacity: 0.02; }
+}
+
+/* Scanline intensity pulse */
+.scanline {
   position: fixed;
   inset: 0;
   pointer-events: none;
   background: repeating-linear-gradient(
-    rgba(255, 255, 255, 0.03) 0px,
-    rgba(0, 0, 0, 0.03) 2px
+    rgba(255,255,255,0.04) 0px,
+    rgba(0,0,0,0.05) 2px
   );
   mix-blend-mode: overlay;
-  animation: flicker 1.8s infinite;
-  z-index: 50;
+  animation: scanPulse 4s infinite ease-in-out;
+  z-index: 20;
 }
-
-@keyframes flicker {
-  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
-    opacity: 0.04;
-  }
-  20%, 24%, 55% {
-    opacity: 0.12;
-  }
-}
-
-/* --- Subtle VHS Wobble --- */
-.vhs-warp {
-  animation: vhsDrift 6s ease-in-out infinite alternate;
-}
-
-@keyframes vhsDrift {
-  0% {
-    transform: translateX(-2px) translateY(-1px) scale(1.001) rotate(-0.1deg);
-    filter: hue-rotate(0deg);
-  }
-  50% {
-    transform: translateX(2px) translateY(1px) scale(1.002) rotate(0.1deg);
-    filter: hue-rotate(2deg);
-  }
-  100% {
-    transform: translateX(-1px) translateY(0px) scale(1.001) rotate(0deg);
-    filter: hue-rotate(-1deg);
-  }
+@keyframes scanPulse {
+  0%,100% { opacity: 0.05; }
+  50% { opacity: 0.1; }
 }
 </style>
 
 <script>
-/* --- Apply drift and flicker layers --- */
+/* === VHS EFFECT SCRIPT === */
 const mainContainer = document.querySelector(".container");
-mainContainer.classList.add("vhs-warp");
+mainContainer.classList.add("vhs-hue", "vhs-wobble");
 
-const crt = document.createElement("div");
-crt.className = "crt-overlay";
-document.body.appendChild(crt);
+const scanOverlay = document.createElement("div");
+scanOverlay.className = "scanline crt-flicker";
+document.body.appendChild(scanOverlay);
+</script>
+<script>
+/* === AMBIENT AUDIO LAYERS === */
+
+const tracks = [
+  new Audio("Bleep (mxd).wav"),
+  new Audio("G U L P (mxd).wav")
+];
+
+// Set loop, volume, and preload
+tracks.forEach(t => {
+  t.loop = true;
+  t.volume = 0.35;
+  t.preload = "auto";
+});
+
+// Alternate between tracks every few minutes
+let currentTrack = 0;
+function playNextTrack() {
+  tracks.forEach((t,i) => { t.pause(); t.currentTime = 0; });
+  currentTrack = (currentTrack + 1) % tracks.length;
+  tracks[currentTrack].play().catch(()=>{});
+  setTimeout(playNextTrack, 240000 + Math.random() * 30000); // every ~4–4.5 min
+}
+
+// Auto start after user interaction (browser policy)
+document.body.addEventListener("click", () => {
+  tracks[currentTrack].play().catch(()=>{});
+  setTimeout(playNextTrack, 240000);
+}, { once: true });
+
+/* === Faint background hum === */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const osc = audioCtx.createOscillator();
+const gain = audioCtx.createGain();
+osc.type = "sine";
+osc.frequency.value = 50; // low hum
+gain.gain.value = 0.02;
+osc.connect(gain).connect(audioCtx.destination);
+osc.start();
+
+document.body.addEventListener("click", () => {
+  if (audioCtx.state === "suspended") audioCtx.resume();
+});
+</script>
+<script>
+/* === AUDIO-REACTIVE GLOW + VHS PULSE === */
+
+let analyser, dataArray;
+
+// Create analyser from the existing audio context
+if (audioCtx) {
+  analyser = audioCtx.createAnalyser();
+  const source = audioCtx.createMediaElementSource(tracks[currentTrack]);
+  source.connect(analyser);
+  analyser.connect(audioCtx.destination);
+  analyser.fftSize = 256;
+  dataArray = new Uint8Array(analyser.frequencyBinCount);
+}
+
+// Pulse effect references
+const playfield = document.querySelector(".playfield");
+const stars = document.querySelector(".stars");
+let vhsRoll = 0;
+
+function animateAudioReactive() {
+  requestAnimationFrame(animateAudioReactive);
+
+  if (analyser && dataArray) {
+    analyser.getByteFrequencyData(dataArray);
+    const avg = dataArray.reduce((a,b)=>a+b,0)/dataArray.length;
+    const pulse = Math.min(avg / 200, 0.5);
+
+    // Glow based on pulse
+    playfield.style.boxShadow = `0 0 ${10 + pulse * 40}px rgba(255,255,255,${0.3 + pulse/2})`;
+    stars.style.opacity = 0.8 + pulse * 0.2;
+  }
+
+  // Subtle VHS vertical roll
+  vhsRoll += 0.0002;
+  document.body.style.backgroundPositionY = `${Math.sin(vhsRoll) * 10}px`;
+}
+
+animateAudioReactive();
+</script>
+<script>
+/* === GAME OVER + AUTO RESTART LOOP === */
+
+let gameOver = false;
+let gameOverTimeout = null;
+
+// Create overlay for the message
+const gameOverScreen = document.createElement("div");
+gameOverScreen.style.position = "absolute";
+gameOverScreen.style.top = "0";
+gameOverScreen.style.left = "0";
+gameOverScreen.style.width = "100%";
+gameOverScreen.style.height = "100%";
+gameOverScreen.style.display = "flex";
+gameOverScreen.style.alignItems = "center";
+gameOverScreen.style.justifyContent = "center";
+gameOverScreen.style.background = "rgba(0,0,0,0.7)";
+gameOverScreen.style.color = "#ff3";
+gameOverScreen.style.fontFamily = "'Courier New', monospace";
+gameOverScreen.style.fontSize = "4vh";
+gameOverScreen.style.letterSpacing = "0.3em";
+gameOverScreen.style.opacity = "0";
+gameOverScreen.style.transition = "opacity 2s ease";
+gameOverScreen.style.zIndex = "1000";
+gameOverScreen.innerText = "GAME  OVER";
+document.body.appendChild(gameOverScreen);
+
+// A simple function to detect pile-up height
+function checkGameOver() {
+  if (fallingPieces.length > 80 && !gameOver) {
+    triggerGameOver();
+  }
+}
+
+function triggerGameOver() {
+  gameOver = true;
+  gameOverScreen.style.opacity = "1";
+  clearInterval(dropInterval);
+
+  // Subtle CRT pulse collapse
+  document.body.style.filter = "brightness(0.3) contrast(1.5)";
+  playfield.style.boxShadow = "0 0 40px rgba(255,0,0,0.6)";
+
+  gameOverTimeout = setTimeout(() => {
+    resetGame();
+  }, 6000); // wait 6 s then restart
+}
+
+function resetGame() {
+  gameOver = false;
+  gameOverScreen.style.opacity = "0";
+  document.body.style.filter = "";
+  playfield.style.boxShadow = "";
+
+  // Clear all piece elements
+  document.querySelectorAll(".piece").forEach(p => p.remove());
+  fallingPieces.length = 0;
+
+  // Restart dropping
+  dropInterval = setInterval(dropPiece, dropSpeed);
+}
+
+// Tie into your existing drop loop
+setInterval(checkGameOver, 1000);
 </script>
