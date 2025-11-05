@@ -349,4 +349,33 @@ function animateCRT() {
 }
 
 animateCRT();
+  <script>
+// === SPEED PATCH ===
+// this section overrides the existing drop timing to control how fast the pieces fall
+
+let fallSpeed = 0.5; // default speed (lower = slower, higher = faster)
+let lastDrop = 0;
+
+function updateGame(time = 0) {
+  const delta = time - lastDrop;
+  
+  // adjust 1000 / fallSpeed for drop interval in ms
+  if (delta > 1000 / fallSpeed) {
+    if (currentPiece) {
+      currentPiece.y += 1; // move down one grid step
+    }
+    lastDrop = time;
+  }
+
+  // draw and loop
+  drawBoard();
+  drawPiece(currentPiece);
+  requestAnimationFrame(updateGame);
+}
+
+// start animation loop
+requestAnimationFrame(updateGame);
+
+// you can change this number live in console to speed/slow down
+// for example: fallSpeed = 1.2
 </script>
