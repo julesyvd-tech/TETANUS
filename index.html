@@ -16,7 +16,7 @@
     color: #0ff;
   }
 
-  /* === CRT Scanline Overlay === */
+  /* === CRT Overlay === */
   body::before {
     content: "";
     position: fixed;
@@ -31,7 +31,7 @@
     mix-blend-mode: overlay;
     pointer-events: none;
     z-index: 5;
-    animation: flicker 0.15s infinite alternate;
+    animation: flicker 0.1s infinite alternate;
   }
 
   @keyframes flicker {
@@ -39,13 +39,12 @@
     50% { opacity: 1; }
   }
 
-  /* === Starfield Background === */
+  /* === Starfield === */
   #stars {
     position: fixed;
     width: 100%;
     height: 100%;
     background: radial-gradient(circle at center, #111 0%, #000 100%);
-    overflow: hidden;
     z-index: 0;
   }
 
@@ -63,7 +62,7 @@
     50% { opacity: 1; }
   }
 
-  /* === Playfield layout === */
+  /* === UI + Playfield === */
   #game-container {
     position: relative;
     z-index: 2;
@@ -79,6 +78,7 @@
     left: 3%;
     text-align: left;
     color: #0ff;
+    z-index: 10;
   }
 
   #ui h1 {
@@ -87,7 +87,7 @@
   }
 
   #timer, #score {
-    font-size: 1.2em;
+    font-size: 1.1em;
     margin-top: 0.5em;
   }
 
@@ -99,7 +99,7 @@
     background: rgba(0, 0, 0, 0.4);
     border: 2px solid #0ff;
     box-shadow: 0 0 20px rgba(0,255,255,0.3);
-    position: relative;
+    animation: pulseBorder 3s ease-in-out infinite;
   }
 
   .cell {
@@ -110,15 +110,18 @@
     justify-content: center;
   }
 
-  /* === Neon Glow + Pulse Patch === */
-  #playfield svg {
-    filter: drop-shadow(0 0 6px rgba(0,255,255,0.5));
-    transition: transform 0.2s ease-in-out, filter 0.3s ease;
-  }
-
-  #playfield svg:hover {
-    transform: scale(1.1);
-    filter: drop-shadow(0 0 10px rgba(255,100,200,0.8));
+  #gameOver {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.9);
+    color: #f0f;
+    font-size: 3em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    z-index: 12;
   }
 
   @keyframes pulseBorder {
@@ -126,17 +129,9 @@
     50% { box-shadow: 0 0 35px rgba(0,255,200,0.7); }
   }
 
-  #playfield {
-    animation: pulseBorder 4s ease-in-out infinite;
-  }
-
-  .cell svg {
-    opacity: 0;
-    animation: fadeInPiece 0.5s forwards ease-in;
-  }
-
-  @keyframes fadeInPiece {
-    to { opacity: 1; }
+  /* Neon piece glow */
+  #playfield svg {
+    filter: drop-shadow(0 0 6px rgba(0,255,255,0.6));
   }
 </style>
 </head>
@@ -146,16 +141,17 @@
 
   <div id="ui">
     <h1>TETANUS</h1>
-    <div id="timer">Time’sUp 03:45</div>
-    <div id="score">Score: -0000123</div>
+    <div id="timer">Time Left: 99:99</div>
+    <div id="score">Score: -000000</div>
   </div>
 
   <div id="game-container">
     <div id="playfield"></div>
+    <div id="gameOver">GAME&nbsp;OVER</div>
   </div>
 
 <script>
-  // Generate starfield
+  // === Starfield generation ===
   const starsContainer = document.getElementById("stars");
   for (let i = 0; i < 150; i++) {
     const s = document.createElement("div");
@@ -167,157 +163,185 @@
   }
 </script>
 <script>
-  const playfield = document.getElementById("playfield");
-  const scoreDisplay = document.getElementById("score");
-  const timerDisplay = document.getElementById("timer");
+// === SVG Pieces (flat stylized art) ===
+const svgPieces = [
+  `<svg width="24" height="24" viewBox="0 0 24 24"><rect x="2" y="8" width="20" height="8" rx="4" ry="4" fill="#ff0055" stroke="#fff" stroke-width="1.2"/></svg>`, // pill
+  `<svg width="24" height="24" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" fill="#d4a373" stroke="#fff" stroke-width="0.8"/><rect x="15" y="5" width="4" height="14" fill="#eee"/></svg>`, // cigarette
+  `<svg width="24" height="24" viewBox="0 0 24 24"><rect x="3" y="10" width="18" height="4" fill="#666"/><circle cx="21" cy="12" r="3" fill="#0ff" opacity="0.4"/></svg>` // pipe
+];
 
-  const rows = 20;
-  const cols = 10;
-  const grid = Array.from({ length: rows }, () => Array(cols).fill(null));
+const playfield = document.getElementById('playfield');
+const rows = 20, cols = 10;
+const cells = [];
+let grid = [];
 
-  // === Stylized flat SVGs ===
-  const pieces = [
-    `<svg width="18" height="8" viewBox="0 0 18 8"><rect width="18" height="8" rx="4" fill="#ff6699"/><rect x="9" width="9" height="8" rx="4" fill="#ffffff"/></svg>`, // pill
-    `<svg width="16" height="6" viewBox="0 0 16 6"><rect width="16" height="6" rx="2" fill="#d4c8b0"/><rect x="12" width="4" height="6" rx="2" fill="#ff3300"/></svg>`, // cigarette
-    `<svg width="14" height="8" viewBox="0 0 14 8"><rect width="10" height="4" y="2" rx="1" fill="#cccccc"/><circle cx="12" cy="4" r="2" fill="#99ffff"/></svg>` // pipe
-  ];
+// build playfield grid
+for (let y = 0; y < rows; y++) {
+  grid[y] = new Array(cols).fill(null);
+  for (let x = 0; x < cols; x++) {
+    const c = document.createElement("div");
+    c.classList.add("cell");
+    playfield.appendChild(c);
+    cells.push(c);
+  }
+}
 
-  function drawGrid() {
-    playfield.innerHTML = "";
-    for (let y = 0; y < rows; y++) {
-      for (let x = 0; x < cols; x++) {
-        const cell = document.createElement("div");
-        cell.className = "cell";
-        if (grid[y][x]) cell.innerHTML = grid[y][x];
-        playfield.appendChild(cell);
-      }
+// === Falling pieces system ===
+let activePieces = [];
+function spawnPiece() {
+  const svg = svgPieces[Math.floor(Math.random() * svgPieces.length)];
+  const x = Math.floor(Math.random() * cols);
+  const el = document.createElement("div");
+  el.classList.add("falling");
+  el.innerHTML = svg;
+  el.style.gridColumnStart = x + 1;
+  el.style.gridRowStart = 1;
+  playfield.appendChild(el);
+  activePieces.push({el, x, y: 0});
+}
+
+// === Update loop ===
+let speed = 60; // lower = faster (chaotic tetris)
+let counter = 0;
+
+function update() {
+  counter++;
+  if (counter % 4 === 0 && Math.random() < 0.8) spawnPiece();
+
+  for (let i = activePieces.length - 1; i >= 0; i--) {
+    const piece = activePieces[i];
+    piece.y += 0.3; // fall speed (adjust here)
+    if (piece.y >= rows - 1) {
+      activePieces.splice(i, 1);
+      continue;
     }
+    piece.el.style.gridRowStart = Math.floor(piece.y) + 1;
   }
 
-  function spawnPiece() {
-    const shape = pieces[Math.floor(Math.random() * pieces.length)];
-    return { x: Math.floor(cols / 2), y: 0, shape };
+  requestAnimationFrame(update);
+}
+update();
+
+// === Timer + Score ===
+let timeLeft = 90; // seconds
+let score = 0;
+const timerEl = document.getElementById("timer");
+const scoreEl = document.getElementById("score");
+const gameOverEl = document.getElementById("gameOver");
+
+function updateTimer() {
+  timeLeft -= 1;
+  let minutes = Math.floor(timeLeft / 60);
+  let seconds = timeLeft % 60;
+  timerEl.textContent = `Time Left: ${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+  
+  score -= Math.floor(Math.random() * 10);
+  scoreEl.textContent = `Score: ${score}`;
+
+  if (timeLeft <= 0) {
+    gameOver();
   }
+}
 
-  let current = spawnPiece();
-  let dropSpeed = 50; // ⚡ twice as fast
-  let score = -123;
-  let countdown = 225; // fake timer value
-  let timer = null;
+function gameOver() {
+  gameOverEl.style.opacity = 1;
+  setTimeout(() => {
+    window.location.reload();
+  }, 4000);
+}
 
-  function canMoveDown(piece) {
-    if (piece.y + 1 >= rows) return false;
-    return !grid[piece.y + 1][piece.x];
-  }
-
-  function placePiece(piece) {
-    if (piece.y >= 0 && piece.y < rows && piece.x >= 0 && piece.x < cols) {
-      grid[piece.y][piece.x] = piece.shape;
-    }
-  }
-
-  function clearLines() {
-    for (let y = rows - 1; y >= 0; y--) {
-      if (grid[y].every(cell => cell !== null)) {
-        grid.splice(y, 1);
-        grid.unshift(Array(cols).fill(null));
-      }
-    }
-  }
-
-  function step() {
-    if (canMoveDown(current)) {
-      current.y++;
-    } else {
-      placePiece(current);
-      clearLines();
-      current = spawnPiece();
-    }
-    drawGrid();
-    renderPiece(current);
-    updateScore();
-    updateTimer();
-  }
-
-  function renderPiece(piece) {
-    const index = piece.y * cols + piece.x;
-    const cells = playfield.children;
-    if (cells[index]) cells[index].innerHTML = piece.shape;
-  }
-
-  function updateScore() {
-    score -= 3;
-    scoreDisplay.textContent = `Score: ${score}`;
-  }
-
-  function updateTimer() {
-    countdown--;
-    if (countdown <= 0) {
-      timerDisplay.textContent = "Time’sUp 00:00";
-      restartGame();
-    } else {
-      const min = Math.floor(countdown / 60);
-      const sec = countdown % 60;
-      timerDisplay.textContent = `Time’sUp ${min.toString().padStart(2,"0")}:${sec.toString().padStart(2,"0")}`;
-    }
-  }
-
-  function restartGame() {
-    clearInterval(timer);
-    for (let y = 0; y < rows; y++) {
-      grid[y].fill(null);
-    }
-    current = spawnPiece();
-    score = -123;
-    countdown = 225;
-    timer = setInterval(step, dropSpeed);
-  }
-
-  drawGrid();
-  timer = setInterval(step, dropSpeed);
+setInterval(updateTimer, 1000);
 </script>
+<!-- === Audio Setup === -->
+<audio id="bleep" src="Bleep (mxd).wav"></audio>
+<audio id="gulp" src="G U L P (mxd).wav"></audio>
+
 <script>
-  // === Audio Setup: plays Bleep (mxd) then G U L P (mxd), then loops ===
-  const tracks = [
-    "Bleep (mxd).wav",
-    "G U L P (mxd).wav"
-  ];
-  let currentTrack = 0;
+// === Background Audio Logic ===
+const bleep = document.getElementById('bleep');
+const gulp = document.getElementById('gulp');
 
-  const audio = new Audio(tracks[currentTrack]);
-  audio.volume = 0.7;
-  audio.loop = false;
-  audio.play();
+bleep.volume = 0.7;
+gulp.volume = 0.7;
 
-  audio.addEventListener("ended", () => {
-    currentTrack = (currentTrack + 1) % tracks.length;
-    const next = new Audio(tracks[currentTrack]);
-    next.volume = 0.7;
-    next.loop = false;
-    next.play();
-    fadeBetween(audio, next);
+bleep.play().then(() => {
+  bleep.onended = () => {
+    gulp.play();
+  };
+  gulp.onended = () => {
+    // Loop both after both have finished
+    setTimeout(() => {
+      bleep.play();
+    }, 500);
+  };
+}).catch(e => console.warn('Audio autoplay blocked:', e));
+
+// === CRT + Starfield Flicker ===
+const crtOverlay = document.createElement('div');
+crtOverlay.classList.add('crt-overlay');
+document.body.appendChild(crtOverlay);
+
+const starfield = document.createElement('canvas');
+starfield.id = 'stars';
+starfield.style.position = 'fixed';
+starfield.style.top = 0;
+starfield.style.left = 0;
+starfield.style.width = '100%';
+starfield.style.height = '100%';
+starfield.style.zIndex = '-1';
+document.body.appendChild(starfield);
+
+const ctx = starfield.getContext('2d');
+let stars = Array.from({length: 120}, () => ({
+  x: Math.random() * window.innerWidth,
+  y: Math.random() * window.innerHeight,
+  r: Math.random() * 1.5
+}));
+
+function drawStars() {
+  ctx.clearRect(0, 0, starfield.width, starfield.height);
+  ctx.fillStyle = '#fff';
+  stars.forEach(s => {
+    ctx.globalAlpha = 0.6 + Math.random() * 0.4;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fill();
   });
+  requestAnimationFrame(drawStars);
+}
 
-  // Smooth crossfade between tracks
-  function fadeBetween(oldTrack, newTrack) {
-    let fade = setInterval(() => {
-      if (oldTrack.volume > 0.05) {
-        oldTrack.volume -= 0.05;
-      } else {
-        oldTrack.pause();
-        clearInterval(fade);
-      }
-    }, 200);
-  }
+function resizeCanvas() {
+  starfield.width = window.innerWidth;
+  starfield.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+drawStars();
 
-  // === Ambient CRT flicker pulse ===
-  const scoreEl = document.getElementById("score");
-  const timerEl = document.getElementById("timer");
-  setInterval(() => {
-    scoreEl.style.opacity = 0.7 + Math.random() * 0.3;
-    timerEl.style.opacity = 0.7 + Math.random() * 0.3;
-  }, 120);
+// === CRT Scanline Flicker Animation ===
+const style = document.createElement('style');
+style.textContent = `
+.crt-overlay {
+  pointer-events: none;
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255,255,255,0.02),
+    rgba(255,255,255,0.02) 1px,
+    rgba(0,0,0,0.08) 2px,
+    rgba(0,0,0,0.08) 3px
+  );
+  mix-blend-mode: overlay;
+  animation: crt-flicker 0.15s infinite;
+}
+@keyframes crt-flicker {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 0.9; }
+}
+`;
+document.head.appendChild(style);
 </script>
-
 </body>
 </html>
