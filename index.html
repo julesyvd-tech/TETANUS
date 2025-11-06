@@ -1,347 +1,280 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TETANUS</title>
-
-<style>
-  html, body {
-    margin: 0;
-    padding: 0;
-    background: black;
-    overflow: hidden;
-    height: 100%;
-    font-family: monospace;
-    color: #0ff;
-  }
-
-  /* === CRT Overlay === */
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    background: repeating-linear-gradient(
-      to bottom,
-      rgba(255,255,255,0.03),
-      rgba(255,255,255,0.03) 1px,
-      transparent 2px,
-      transparent 3px
-    );
-    mix-blend-mode: overlay;
-    pointer-events: none;
-    z-index: 5;
-    animation: flicker 0.1s infinite alternate;
-  }
-
-  @keyframes flicker {
-    0%, 100% { opacity: 0.85; }
-    50% { opacity: 1; }
-  }
-
-  /* === Starfield === */
-  #stars {
-    position: fixed;
-    width: 100%;
-    height: 100%;
-    background: radial-gradient(circle at center, #111 0%, #000 100%);
-    z-index: 0;
-  }
-
-  .star {
-    position: absolute;
-    background: white;
-    width: 2px;
-    height: 2px;
-    opacity: 0.8;
-    animation: twinkle 3s infinite ease-in-out;
-  }
-
-  @keyframes twinkle {
-    0%, 100% { opacity: 0.3; }
-    50% { opacity: 1; }
-  }
-
-  /* === UI + Playfield === */
-  #game-container {
-    position: relative;
-    z-index: 2;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-  }
-
-  #ui {
-    position: absolute;
-    top: 2%;
-    left: 3%;
-    text-align: left;
-    color: #0ff;
-    z-index: 10;
-  }
-
-  #ui h1 {
-    font-size: 1.5em;
-    letter-spacing: 2px;
-  }
-
-  #timer, #score {
-    font-size: 1.1em;
-    margin-top: 0.5em;
-  }
-
-  #playfield {
-    display: grid;
-    grid-template-columns: repeat(10, 24px);
-    grid-template-rows: repeat(20, 24px);
-    gap: 1px;
-    background: rgba(0, 0, 0, 0.4);
-    border: 2px solid #0ff;
-    box-shadow: 0 0 20px rgba(0,255,255,0.3);
-    animation: pulseBorder 3s ease-in-out infinite;
-  }
-
-  .cell {
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  #gameOver {
-    position: absolute;
-    inset: 0;
-    background: rgba(0,0,0,0.9);
-    color: #f0f;
-    font-size: 3em;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    transition: opacity 0.5s ease;
-    z-index: 12;
-  }
-
-  @keyframes pulseBorder {
-    0%, 100% { box-shadow: 0 0 20px rgba(0,255,200,0.3); }
-    50% { box-shadow: 0 0 35px rgba(0,255,200,0.7); }
-  }
-
-  /* Neon piece glow */
-  #playfield svg {
-    filter: drop-shadow(0 0 6px rgba(0,255,255,0.6));
-  }
-</style>
-</head>
-
-<body>
-  <div id="stars"></div>
-
-  <div id="ui">
-    <h1>TETANUS</h1>
-    <div id="timer">Time Left: 99:99</div>
-    <div id="score">Score: -000000</div>
-  </div>
-
-  <div id="game-container">
-    <div id="playfield"></div>
-    <div id="gameOver">GAME&nbsp;OVER</div>
-  </div>
-
-<script>
-  // === Starfield generation ===
-  const starsContainer = document.getElementById("stars");
-  for (let i = 0; i < 150; i++) {
-    const s = document.createElement("div");
-    s.className = "star";
-    s.style.top = Math.random() * 100 + "%";
-    s.style.left = Math.random() * 100 + "%";
-    s.style.animationDelay = (Math.random() * 3) + "s";
-    starsContainer.appendChild(s);
-  }
-</script>
-<script>
-// === SVG Pieces (flat stylized art) ===
-const svgPieces = [
-  `<svg width="24" height="24" viewBox="0 0 24 24"><rect x="2" y="8" width="20" height="8" rx="4" ry="4" fill="#ff0055" stroke="#fff" stroke-width="1.2"/></svg>`, // pill
-  `<svg width="24" height="24" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" fill="#d4a373" stroke="#fff" stroke-width="0.8"/><rect x="15" y="5" width="4" height="14" fill="#eee"/></svg>`, // cigarette
-  `<svg width="24" height="24" viewBox="0 0 24 24"><rect x="3" y="10" width="18" height="4" fill="#666"/><circle cx="21" cy="12" r="3" fill="#0ff" opacity="0.4"/></svg>` // pipe
-];
-
-const playfield = document.getElementById('playfield');
-const rows = 20, cols = 10;
-const cells = [];
-let grid = [];
-
-// build playfield grid
-for (let y = 0; y < rows; y++) {
-  grid[y] = new Array(cols).fill(null);
-  for (let x = 0; x < cols; x++) {
-    const c = document.createElement("div");
-    c.classList.add("cell");
-    playfield.appendChild(c);
-    cells.push(c);
-  }
-}
-
-// === Falling pieces system ===
-let activePieces = [];
-function spawnPiece() {
-  const svg = svgPieces[Math.floor(Math.random() * svgPieces.length)];
-  const x = Math.floor(Math.random() * cols);
-  const el = document.createElement("div");
-  el.classList.add("falling");
-  el.innerHTML = svg;
-  el.style.gridColumnStart = x + 1;
-  el.style.gridRowStart = 1;
-  playfield.appendChild(el);
-  activePieces.push({el, x, y: 0});
-}
-
-// === Update loop ===
-let speed = 60; // lower = faster (chaotic tetris)
-let counter = 0;
-
-function update() {
-  counter++;
-  if (counter % 4 === 0 && Math.random() < 0.8) spawnPiece();
-
-  for (let i = activePieces.length - 1; i >= 0; i--) {
-    const piece = activePieces[i];
-    piece.y += 0.3; // fall speed (adjust here)
-    if (piece.y >= rows - 1) {
-      activePieces.splice(i, 1);
-      continue;
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TETANUS</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: black;
+      color: #00fff7;
+      font-family: monospace;
+      height: 100%;
+      width: 100%;
     }
-    piece.el.style.gridRowStart = Math.floor(piece.y) + 1;
-  }
 
-  requestAnimationFrame(update);
-}
-update();
+    #crt {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.1);
+      pointer-events: none;
+      z-index: 5;
+      mix-blend-mode: lighten;
+      animation: flicker 0.12s infinite;
+    }
 
-// === Timer + Score ===
-let timeLeft = 90; // seconds
-let score = 0;
-const timerEl = document.getElementById("timer");
-const scoreEl = document.getElementById("score");
-const gameOverEl = document.getElementById("gameOver");
+    @keyframes flicker {
+      0% { opacity: 0.9; }
+      50% { opacity: 1; }
+      100% { opacity: 0.85; }
+    }
 
-function updateTimer() {
-  timeLeft -= 1;
-  let minutes = Math.floor(timeLeft / 60);
-  let seconds = timeLeft % 60;
-  timerEl.textContent = `Time Left: ${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
-  
-  score -= Math.floor(Math.random() * 10);
-  scoreEl.textContent = `Score: ${score}`;
+    canvas {
+      display: block;
+      margin: 80px auto 0;
+      border: 2px solid #00fff7;
+      box-shadow: 0 0 25px #00fff7;
+      background: rgba(0, 0, 0, 0.8);
+      position: relative;
+      z-index: 2;
+    }
 
-  if (timeLeft <= 0) {
-    gameOver();
-  }
-}
+    #title {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 2rem;
+      letter-spacing: 4px;
+      text-shadow: 0 0 10px #00fff7;
+      position: relative;
+      z-index: 3;
+    }
 
-function gameOver() {
-  gameOverEl.style.opacity = 1;
-  setTimeout(() => {
-    window.location.reload();
-  }, 4000);
-}
+    #info {
+      text-align: center;
+      font-size: 1rem;
+      color: #00fff7;
+      margin-top: 5px;
+      position: relative;
+      z-index: 3;
+    }
 
-setInterval(updateTimer, 1000);
-</script>
-<!-- === Audio Setup === -->
-<audio id="bleep" src="Bleep (mxd).wav"></audio>
-<audio id="gulp" src="G U L P (mxd).wav"></audio>
+    .star {
+      position: absolute;
+      background: white;
+      border-radius: 50%;
+      opacity: 0.8;
+      animation: twinkle 2s infinite ease-in-out;
+    }
 
-<script>
-// === Background Audio Logic ===
-const bleep = document.getElementById('bleep');
-const gulp = document.getElementById('gulp');
+    @keyframes twinkle {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div id="title">TETANUS</div>
+  <div id="info">
+    <div id="timer">Time Left: 01:30</div>
+    <div id="score">Score: 0</div>
+  </div>
+  <canvas id="gameCanvas" width="300" height="600"></canvas>
+  <div id="crt"></div>
 
-bleep.volume = 0.7;
-gulp.volume = 0.7;
+  <audio id="bleep" src="bleep.mp3"></audio>
+  <audio id="gulp" src="gulp.mp3"></audio>
 
-bleep.play().then(() => {
-  bleep.onended = () => {
-    gulp.play();
-  };
-  gulp.onended = () => {
-    // Loop both after both have finished
-    setTimeout(() => {
-      bleep.play();
-    }, 500);
-  };
-}).catch(e => console.warn('Audio autoplay blocked:', e));
+  <script>
+    // === STARFIELD BACKGROUND ===
+    const starCount = 75;
+    for (let i = 0; i < starCount; i++) {
+      const star = document.createElement('div');
+      star.className = 'star';
+      star.style.width = star.style.height = Math.random() * 2 + 'px';
+      star.style.top = Math.random() * 100 + '%';
+      star.style.left = Math.random() * 100 + '%';
+      star.style.animationDuration = (Math.random() * 2 + 1) + 's';
+      document.body.appendChild(star);
+    }
 
-// === CRT + Starfield Flicker ===
-const crtOverlay = document.createElement('div');
-crtOverlay.classList.add('crt-overlay');
-document.body.appendChild(crtOverlay);
+    // === GAME VARIABLES ===
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const cols = 10, rows = 20, cell = 30;
+    const grid = Array.from({ length: rows }, () => Array(cols).fill(0));
 
-const starfield = document.createElement('canvas');
-starfield.id = 'stars';
-starfield.style.position = 'fixed';
-starfield.style.top = 0;
-starfield.style.left = 0;
-starfield.style.width = '100%';
-starfield.style.height = '100%';
-starfield.style.zIndex = '-1';
-document.body.appendChild(starfield);
+    const colors = ['#00fff7', '#ff007c', '#ffaa00'];
+    const icons = [
+      // pill
+      [
+        [1,1],
+        [1,1]
+      ],
+      // cig
+      [
+        [1,1,1,1]
+      ],
+      // pipe
+      [
+        [1,1,0],
+        [0,1,1]
+      ]
+    ];
 
-const ctx = starfield.getContext('2d');
-let stars = Array.from({length: 120}, () => ({
-  x: Math.random() * window.innerWidth,
-  y: Math.random() * window.innerHeight,
-  r: Math.random() * 1.5
-}));
+    let currentPiece = createPiece();
+    let lastFall = 0;
+    let fallInterval = 60; // very fast tetris speed
+    let score = 0;
+    let timeLeft = 90;
+    let gameOver = false;
+    // === AUDIO SETUP ===
+    const bleep = document.getElementById('bleep');
+    const gulp = document.getElementById('gulp');
 
-function drawStars() {
-  ctx.clearRect(0, 0, starfield.width, starfield.height);
-  ctx.fillStyle = '#fff';
-  stars.forEach(s => {
-    ctx.globalAlpha = 0.6 + Math.random() * 0.4;
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-    ctx.fill();
-  });
-  requestAnimationFrame(drawStars);
-}
+    function startAudio() {
+      bleep.play().then(() => gulp.play());
+      gulp.addEventListener('ended', () => {
+        bleep.play();
+        gulp.play();
+      });
+    }
 
-function resizeCanvas() {
-  starfield.width = window.innerWidth;
-  starfield.height = window.innerHeight;
-}
-resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
-drawStars();
+    // === PIECE CREATION ===
+    function createPiece() {
+      const type = Math.floor(Math.random() * icons.length);
+      return {
+        shape: icons[type],
+        color: colors[type],
+        x: Math.floor(cols / 2) - 1,
+        y: 0
+      };
+    }
 
-// === CRT Scanline Flicker Animation ===
-const style = document.createElement('style');
-style.textContent = `
-.crt-overlay {
-  pointer-events: none;
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  background: repeating-linear-gradient(
-    to bottom,
-    rgba(255,255,255,0.02),
-    rgba(255,255,255,0.02) 1px,
-    rgba(0,0,0,0.08) 2px,
-    rgba(0,0,0,0.08) 3px
-  );
-  mix-blend-mode: overlay;
-  animation: crt-flicker 0.15s infinite;
-}
-@keyframes crt-flicker {
-  0%, 100% { opacity: 0.85; }
-  50% { opacity: 0.9; }
-}
-`;
-document.head.appendChild(style);
-</script>
+    // === DRAW GAME ===
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // draw settled blocks
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          if (grid[y][x]) drawCell(x, y, grid[y][x]);
+        }
+      }
+      // draw current piece
+      for (let y = 0; y < currentPiece.shape.length; y++) {
+        for (let x = 0; x < currentPiece.shape[y].length; x++) {
+          if (currentPiece.shape[y][x]) {
+            drawCell(currentPiece.x + x, currentPiece.y + y, currentPiece.color);
+          }
+        }
+      }
+    }
+
+    function drawCell(x, y, color) {
+      ctx.fillStyle = color;
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = color;
+      ctx.fillRect(x * cell, y * cell, cell - 2, cell - 2);
+    }
+
+    // === COLLISION ===
+    function collision() {
+      for (let y = 0; y < currentPiece.shape.length; y++) {
+        for (let x = 0; x < currentPiece.shape[y].length; x++) {
+          if (currentPiece.shape[y][x]) {
+            const newY = currentPiece.y + y;
+            const newX = currentPiece.x + x;
+            if (
+              newY >= rows ||
+              newX < 0 ||
+              newX >= cols ||
+              grid[newY][newX]
+            ) return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    // === MERGE & CLEAR ===
+    function merge() {
+      currentPiece.shape.forEach((row, y) => {
+        row.forEach((val, x) => {
+          if (val) grid[currentPiece.y + y][currentPiece.x + x] = currentPiece.color;
+        });
+      });
+
+      // clear full rows
+      let cleared = 0;
+      for (let y = rows - 1; y >= 0; y--) {
+        if (grid[y].every(cell => cell)) {
+          grid.splice(y, 1);
+          grid.unshift(Array(cols).fill(0));
+          cleared++;
+        }
+      }
+      if (cleared > 0) {
+        score -= cleared * 50;
+        document.getElementById('score').textContent = `Score: ${score}`;
+      }
+    }
+
+    // === UPDATE ===
+    function update(timestamp) {
+      if (gameOver) return;
+      if (!lastFall) lastFall = timestamp;
+      const delta = timestamp - lastFall;
+      if (delta > fallInterval) {
+        currentPiece.y++;
+        if (collision()) {
+          currentPiece.y--;
+          merge();
+          if (currentPiece.y <= 0) {
+            endGame();
+            return;
+          }
+          currentPiece = createPiece();
+        }
+        lastFall = timestamp;
+      }
+      draw();
+      requestAnimationFrame(update);
+    }
+
+    function endGame() {
+      gameOver = true;
+      ctx.fillStyle = '#ff007c';
+      ctx.font = '24px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2);
+    }
+
+    // === TIMER ===
+    setInterval(() => {
+      if (!gameOver) {
+        timeLeft--;
+        if (timeLeft <= 0) {
+          timeLeft = 0;
+          endGame();
+        }
+        let mins = Math.floor(timeLeft / 60);
+        let secs = (timeLeft % 60).toString().padStart(2, '0');
+        document.getElementById('timer').textContent = `Time Left: ${mins}:${secs}`;
+      }
+    }, 1000);
+
+    // === START ===
+    window.addEventListener('click', () => {
+      if (!gameOver) {
+        startAudio();
+        requestAnimationFrame(update);
+      }
+    });
+  </script>
 </body>
 </html>
