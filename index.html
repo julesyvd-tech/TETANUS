@@ -3,278 +3,265 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TETANUS</title>
+  <title>Tetanus</title>
   <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
+    body {
       background: black;
-      color: #00fff7;
-      font-family: monospace;
-      height: 100%;
-      width: 100%;
+      color: limegreen;
+      font-family: 'Courier New', monospace;
+      margin: 0;
+      overflow: hidden;
     }
 
-    #crt {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(0, 0, 0, 0.1);
+    /* CRT scanline + flicker */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(0,0,0,0.15),
+        rgba(0,0,0,0.15) 1px,
+        transparent 2px,
+        transparent 3px
+      );
       pointer-events: none;
-      z-index: 5;
-      mix-blend-mode: lighten;
-      animation: flicker 0.12s infinite;
+      z-index: 999;
+      animation: flicker 2s infinite alternate;
     }
-
     @keyframes flicker {
-      0% { opacity: 0.9; }
-      50% { opacity: 1; }
-      100% { opacity: 0.85; }
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 0.8; }
     }
 
     canvas {
       display: block;
-      margin: 80px auto 0;
-      border: 2px solid #00fff7;
-      box-shadow: 0 0 25px #00fff7;
-      background: rgba(0, 0, 0, 0.8);
-      position: relative;
-      z-index: 2;
+      margin: 0 auto;
+      background: rgba(0,0,0,0.9);
+      border: 2px solid limegreen;
+      image-rendering: pixelated;
     }
 
-    #title {
-      text-align: center;
-      margin-top: 20px;
-      font-size: 2rem;
-      letter-spacing: 4px;
-      text-shadow: 0 0 10px #00fff7;
-      position: relative;
-      z-index: 3;
+    .hud {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      font-size: 16px;
+      color: limegreen;
+      text-shadow: 0 0 4px limegreen;
     }
 
-    #info {
-      text-align: center;
-      font-size: 1rem;
-      color: #00fff7;
-      margin-top: 5px;
-      position: relative;
-      z-index: 3;
+    .title {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      font-size: 24px;
+      color: limegreen;
+      font-weight: bold;
+      text-shadow: 0 0 6px limegreen;
+    }
+
+    .score {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      font-size: 16px;
+      text-align: right;
+    }
+
+    #gameOver {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 36px;
+      color: red;
+      text-shadow: 0 0 10px red;
+      display: none;
+    }
+
+    @keyframes starTwinkle {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 1; }
     }
 
     .star {
       position: absolute;
+      width: 2px;
+      height: 2px;
       background: white;
-      border-radius: 50%;
-      opacity: 0.8;
-      animation: twinkle 2s infinite ease-in-out;
-    }
-
-    @keyframes twinkle {
-      0%, 100% { opacity: 0.5; }
-      50% { opacity: 1; }
+      animation: starTwinkle 2s infinite ease-in-out;
     }
   </style>
 </head>
 <body>
-  <div id="title">TETANUS</div>
-  <div id="info">
-    <div id="timer">Time Left: 01:30</div>
-    <div id="score">Score: 0</div>
-  </div>
-  <canvas id="gameCanvas" width="300" height="600"></canvas>
-  <div id="crt"></div>
-
-  <audio id="bleep" src="bleep.mp3"></audio>
-  <audio id="gulp" src="gulp.mp3"></audio>
+  <div class="title">Tetanus</div>
+  <div class="hud" id="timer">Time Left: 300</div>
+  <div class="score" id="score">Score: 0</div>
+  <canvas id="tetris" width="240" height="400"></canvas>
+  <div id="gameOver">GAME OVER</div>
 
   <script>
-    // === STARFIELD BACKGROUND ===
-    const starCount = 75;
-    for (let i = 0; i < starCount; i++) {
-      const star = document.createElement('div');
-      star.className = 'star';
-      star.style.width = star.style.height = Math.random() * 2 + 'px';
-      star.style.top = Math.random() * 100 + '%';
-      star.style.left = Math.random() * 100 + '%';
-      star.style.animationDuration = (Math.random() * 2 + 1) + 's';
-      document.body.appendChild(star);
+    /* 🌌 Starfield */
+    for (let i = 0; i < 100; i++) {
+      const s = document.createElement('div');
+      s.className = 'star';
+      s.style.top = Math.random() * 100 + '%';
+      s.style.left = Math.random() * 100 + '%';
+      s.style.animationDuration = (1 + Math.random() * 3) + 's';
+      document.body.appendChild(s);
     }
 
-    // === GAME VARIABLES ===
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    const cols = 10, rows = 20, cell = 30;
-    const grid = Array.from({ length: rows }, () => Array(cols).fill(0));
+    /* 🎵 Audio setup */
+    const bleep = new Audio('Bleep (mxd).wav');
+    const gulp = new Audio('G U L P (mxd).wav');
+    bleep.loop = false;
+    gulp.loop = false;
+    bleep.volume = 0.7;
+    gulp.volume = 0.7;
+    bleep.playbackRate = 1.25; // 25% faster playback
 
-    const colors = ['#00fff7', '#ff007c', '#ffaa00'];
-    const icons = [
-      // pill
-      [
-        [1,1],
-        [1,1]
-      ],
-      // cig
-      [
-        [1,1,1,1]
-      ],
-      // pipe
-      [
-        [1,1,0],
-        [0,1,1]
-      ]
+    async function playAudio() {
+      try {
+        await bleep.play();
+        bleep.onended = async () => {
+          await gulp.play();
+          gulp.onended = async () => {
+            await bleep.play();
+          };
+        };
+      } catch (err) {
+        console.log('Audio autoplay blocked:', err);
+      }
+    }
+    window.addEventListener('load', playAudio);
+    /* 🎮 Gameplay setup */
+    const canvas = document.getElementById('tetris');
+    const ctx = canvas.getContext('2d');
+    const ROWS = 20;
+    const COLS = 12;
+    const BLOCK = 20;
+
+    const colors = ['#00FF99', '#FF0044', '#CCCCCC']; // pill, cig, pipe
+    const shapes = [
+      [[1,1]], // pill horizontal
+      [[1],[1]], // cig vertical
+      [[1,1,1]]  // pipe
     ];
 
-    let currentPiece = createPiece();
-    let lastFall = 0;
-    let fallInterval = 60; // very fast tetris speed
-    let score = 0;
-    let timeLeft = 90;
+    let field = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+    let current, pos, score = 0, timer = 300;
+    let dropInterval = 50; // very fast drop speed
+    let lastDrop = 0;
     let gameOver = false;
-    // === AUDIO SETUP ===
-    const bleep = document.getElementById('bleep');
-    const gulp = document.getElementById('gulp');
 
-    function startAudio() {
-      bleep.play().then(() => gulp.play());
-      gulp.addEventListener('ended', () => {
-        bleep.play();
-        gulp.play();
-      });
+    function newPiece() {
+      const id = Math.floor(Math.random() * shapes.length);
+      const shape = shapes[id];
+      pos = {x: Math.floor(COLS/2) - Math.floor(shape[0].length/2), y: 0};
+      current = {id, shape};
+      if (collide(field, current, pos)) endGame();
     }
 
-    // === PIECE CREATION ===
-    function createPiece() {
-      const type = Math.floor(Math.random() * icons.length);
-      return {
-        shape: icons[type],
-        color: colors[type],
-        x: Math.floor(cols / 2) - 1,
-        y: 0
-      };
-    }
-
-    // === DRAW GAME ===
-    function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      // draw settled blocks
-      for (let y = 0; y < rows; y++) {
-        for (let x = 0; x < cols; x++) {
-          if (grid[y][x]) drawCell(x, y, grid[y][x]);
-        }
-      }
-      // draw current piece
-      for (let y = 0; y < currentPiece.shape.length; y++) {
-        for (let x = 0; x < currentPiece.shape[y].length; x++) {
-          if (currentPiece.shape[y][x]) {
-            drawCell(currentPiece.x + x, currentPiece.y + y, currentPiece.color);
-          }
-        }
-      }
-    }
-
-    function drawCell(x, y, color) {
-      ctx.fillStyle = color;
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = color;
-      ctx.fillRect(x * cell, y * cell, cell - 2, cell - 2);
-    }
-
-    // === COLLISION ===
-    function collision() {
-      for (let y = 0; y < currentPiece.shape.length; y++) {
-        for (let x = 0; x < currentPiece.shape[y].length; x++) {
-          if (currentPiece.shape[y][x]) {
-            const newY = currentPiece.y + y;
-            const newX = currentPiece.x + x;
-            if (
-              newY >= rows ||
-              newX < 0 ||
-              newX >= cols ||
-              grid[newY][newX]
-            ) return true;
-          }
+    function collide(field, piece, offset) {
+      for (let y = 0; y < piece.shape.length; y++) {
+        for (let x = 0; x < piece.shape[y].length; x++) {
+          if (piece.shape[y][x] &&
+             (field[y + offset.y] && field[y + offset.y][x + offset.x]) !== 0)
+             return true;
         }
       }
       return false;
     }
 
-    // === MERGE & CLEAR ===
-    function merge() {
-      currentPiece.shape.forEach((row, y) => {
+    function merge(field, piece, offset) {
+      piece.shape.forEach((row, y) => {
         row.forEach((val, x) => {
-          if (val) grid[currentPiece.y + y][currentPiece.x + x] = currentPiece.color;
+          if (val) field[y + offset.y][x + offset.x] = piece.id + 1;
         });
       });
+    }
 
-      // clear full rows
-      let cleared = 0;
-      for (let y = rows - 1; y >= 0; y--) {
-        if (grid[y].every(cell => cell)) {
-          grid.splice(y, 1);
-          grid.unshift(Array(cols).fill(0));
-          cleared++;
+    function clearLines() {
+      let lines = 0;
+      field = field.filter(row => {
+        if (row.every(v => v !== 0)) {
+          lines++;
+          return false;
         }
-      }
-      if (cleared > 0) {
-        score -= cleared * 50;
-        document.getElementById('score').textContent = `Score: ${score}`;
+        return true;
+      });
+      while (field.length < ROWS) field.unshift(Array(COLS).fill(0));
+      if (lines > 0) score -= lines * 50;
+      document.getElementById('score').textContent = `Score: ${score}`;
+    }
+
+    function drawBlock(x, y, color) {
+      ctx.fillStyle = color;
+      ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK - 1, BLOCK - 1);
+    }
+
+    function draw() {
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      field.forEach((row, y) => row.forEach((val, x) => {
+        if (val) drawBlock(x, y, colors[val-1]);
+      }));
+      if (current) {
+        current.shape.forEach((row, y) => row.forEach((val, x) => {
+          if (val) drawBlock(x + pos.x, y + pos.y, colors[current.id]);
+        }));
       }
     }
 
-    // === UPDATE ===
-    function update(timestamp) {
-      if (gameOver) return;
-      if (!lastFall) lastFall = timestamp;
-      const delta = timestamp - lastFall;
-      if (delta > fallInterval) {
-        currentPiece.y++;
-        if (collision()) {
-          currentPiece.y--;
-          merge();
-          if (currentPiece.y <= 0) {
-            endGame();
-            return;
-          }
-          currentPiece = createPiece();
-        }
-        lastFall = timestamp;
+    function drop() {
+      pos.y++;
+      if (collide(field, current, pos)) {
+        pos.y--;
+        merge(field, current, pos);
+        clearLines();
+        newPiece();
       }
+      lastDrop = Date.now();
+    }
+
+    function update() {
+      if (gameOver) return;
+      const now = Date.now();
+      if (now - lastDrop > dropInterval) drop();
       draw();
       requestAnimationFrame(update);
     }
 
     function endGame() {
       gameOver = true;
-      ctx.fillStyle = '#ff007c';
-      ctx.font = '24px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2);
+      document.getElementById('gameOver').style.display = 'block';
+      setTimeout(() => {
+        resetGame();
+      }, 3000);
     }
 
-    // === TIMER ===
+    function resetGame() {
+      field = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+      score = 0;
+      document.getElementById('score').textContent = 'Score: 0';
+      document.getElementById('gameOver').style.display = 'none';
+      timer = 300;
+      gameOver = false;
+      newPiece();
+      update();
+    }
+
+    newPiece();
+    update();
+
+    /* ⏱ Timer countdown */
     setInterval(() => {
       if (!gameOver) {
-        timeLeft--;
-        if (timeLeft <= 0) {
-          timeLeft = 0;
-          endGame();
-        }
-        let mins = Math.floor(timeLeft / 60);
-        let secs = (timeLeft % 60).toString().padStart(2, '0');
-        document.getElementById('timer').textContent = `Time Left: ${mins}:${secs}`;
+        timer--;
+        document.getElementById('timer').textContent = `Time Left: ${timer}`;
+        if (timer <= 0) endGame();
       }
     }, 1000);
-
-    // === START ===
-    window.addEventListener('click', () => {
-      if (!gameOver) {
-        startAudio();
-        requestAnimationFrame(update);
-      }
-    });
   </script>
 </body>
 </html>
